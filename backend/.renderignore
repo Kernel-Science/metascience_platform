@@ -1,0 +1,38 @@
+# Render deployment ignore file
+# Similar to .gitignore but for Render deployments
+
+# Development files
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Documentation (not needed at runtime)
+problem.md
+CONTRIBUTING.md
+CHANGELOG.md
+SECURITY.md
+
+# Local environment
+.env.local
+.env.*.local
+
+# System files
+.DS_Store
+*.log
+

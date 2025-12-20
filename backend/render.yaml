@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: metascience-backend
+    runtime: python
+    plan: free  # Change to 'starter' or higher for production
+    region: oregon  # Choose region closest to your users: oregon, frankfurt, singapore, ohio
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.4
+      # Add your environment variables here
+      - key: ANTHROPIC_API_KEY
+        sync: false  # Set this in Render dashboard
+      - key: GOOGLE_API_KEY
+        sync: false  # Set this in Render dashboard
+    healthCheckPath: /api/health
+    # Render has a 100MB payload limit (much better than Vercel's 4.5MB!)
+    # For larger files, you'll still want to use S3 presigned URLs
+

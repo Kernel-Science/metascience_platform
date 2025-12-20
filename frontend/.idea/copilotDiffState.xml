@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="CopilotDiffPersistence">
+    <option name="pendingDiffs">
+      <map>
+        <entry key="$PROJECT_DIR$/.env.example">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/.env.example" />
+              <option name="updatedContent" value="# Backend API URL (update after deploying backend)&#10;NEXT_PUBLIC_BACKEND_URL=http://localhost:8000&#10;&#10;# Supabase (if you're using it)&#10;NEXT_PUBLIC_SUPABASE_URL=your-supabase-url&#10;NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key&#10;" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+        <entry key="$PROJECT_DIR$/backend/Dockerfile">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/backend/Dockerfile" />
+              <option name="updatedContent" value="FROM python:3.11-slim&#10;&#10;WORKDIR /app&#10;&#10;# Install dependencies&#10;COPY requirements.txt .&#10;RUN pip install --no-cache-dir -r requirements.txt&#10;&#10;# Copy application&#10;COPY . .&#10;&#10;# Expose port&#10;EXPOSE 8000&#10;&#10;# Run the application&#10;CMD [&quot;uvicorn&quot;, &quot;app.main:app&quot;, &quot;--host&quot;, &quot;0.0.0.0&quot;, &quot;--port&quot;, &quot;8000&quot;]&#10;" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+        <entry key="$PROJECT_DIR$/backend/Procfile">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/backend/Procfile" />
+              <option name="updatedContent" value="web: uvicorn app.main:app --host 0.0.0.0 --port $PORT&#10;" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+        <entry key="$PROJECT_DIR$/backend/railway.json">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/backend/railway.json" />
+              <option name="updatedContent" value="{&#10;  &quot;$schema&quot;: &quot;https://railway.app/railway.schema.json&quot;,&#10;  &quot;build&quot;: {&#10;    &quot;builder&quot;: &quot;NIXPACKS&quot;&#10;  },&#10;  &quot;deploy&quot;: {&#10;    &quot;startCommand&quot;: &quot;uvicorn app.main:app --host 0.0.0.0 --port $PORT&quot;,&#10;    &quot;restartPolicyType&quot;: &quot;ON_FAILURE&quot;,&#10;    &quot;restartPolicyMaxRetries&quot;: 10&#10;  }&#10;}&#10;" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+        <entry key="$PROJECT_DIR$/backend/render.yaml">
+          <value>
+            <PendingDiffInfo>
+              <option name="filePath" value="$PROJECT_DIR$/backend/render.yaml" />
+              <option name="updatedContent" value="services:&#10;  - type: web&#10;    name: metascience-backend&#10;    env: python&#10;    buildCommand: pip install -r requirements.txt&#10;    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT&#10;    envVars:&#10;      - key: PYTHON_VERSION&#10;        value: 3.11&#10;" />
+            </PendingDiffInfo>
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+</project>

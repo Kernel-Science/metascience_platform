@@ -1,0 +1,182 @@
+Return exactly one JSON array containing one review object in this exact format:
+
+[{"model": "reviews.review", "pk": 4, "fields": {"paper": "paper Title", "reviewer": "AI", "status": "pending", "formal_correctness": 4.0, "reproducibility": 3.5, "impact": 2.0, "novelty": 3.5, "writing_clarity": 3.5, "writing_grammar": 3.0, "writing_fairness": 0.5, "interdisciplinarity": 2.5, "confidence": 8.0, "review_text": "The paper by Zhang et al. reports on an early digital quantum simulation experiment using NMR qubits. The subject of the quantum simulation is a frustrated spin model, with emphasis on finite temperature results. The main importance/novelty of the paper, however, is not the physics of the simulated system, in particular as only tiny system sizes has been studied (3 spins), but the simulation method itself (which possibly is scalable towards larger systems). Analog quantum simulations have been achieved before on other platforms (e.g. trapped ions), relying on adiabatic state preparation which can be problematic near gap closings. The approach reported by Zhang et al. takes a novel approach by breaking the dynamics down to elementary gate operations.  Certainly, an important challenge was then also the implementation of these circuits in the quantum hardware, but the paper is particularly appealing due to the fact that (in principle) these circuits can be run on any digital quantum hardware. Since the paper has been published, many quantum devices have become available, which increases the paper's impact. This said, 13 years after publication, a quantum simulation/quantum circuit of three qubits appears quite trivial, however I would judge that the paper has been a pioneering contribution to the field of digital quantum simulation.", "review_date": "2025-09-01"}}]
+
+CRITICAL JSON FORMATTING REQUIREMENTS:
+1. Return ONLY the JSON array - no markdown code blocks, no explanatory text, no comments
+2. Ensure ALL string values are properly escaped (newlines as \n, quotes as \", etc.)
+3. The review_text field MUST have all special characters properly escaped
+4. Use valid JSON syntax - no trailing commas, no unescaped quotes
+5. The output must be parseable by standard JSON parsers
+
+Scoring rubrics
+
+• Self-assessed confidence. Evaluate how confident you are in your review assessment based on your understanding of the paper's domain, methodology, and the clarity of the information provided. Consider factors such as: familiarity with the research area, availability of sufficient detail in the paper for proper evaluation, consistency of the paper's claims with established knowledge, and any limitations in your ability to fully assess technical aspects.
+Scale: 1 – Very low confidence (limited understanding of domain, insufficient information to evaluate)
+2 – Low confidence (some familiarity but significant uncertainties)
+3-4 – Moderate confidence (reasonable understanding but some gaps)
+5-6 – Good confidence (solid understanding with minor uncertainties)
+7-8 – High confidence (strong understanding, clear assessment)
+9-10 – Very high confidence (expert-level understanding, comprehensive assessment)
+Scores: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+
+• Formal correctness/soundness. Are reasoning and math sound? Does it contain
+mistakes? A sound inference procedure infers things that are valid consequences. Are all the
+premises well-explained and true? Are the conclusions valid? A sound argument is a valid
+argument with true premises.
+Scale: 1 – Unsound/fallacious
+2 – Flawed/weak
+3 – Coherent/valid
+4 – Sound/correct
+Scores: 1, 1.5, 2, 2.5, 3, 3.5, 4
+• Reproducibility. Regarding experimental studies, other researchers should be able to
+conduct the same experiments, following all the methods and procedures described in the
+original paper, and obtain similar results. Data collected must be shared. Computational
+studies should provide and share the code, algorithms, and data used. Other researchers
+should be able to run the same code on the same data and achieve the same results to verify
+the claims made in the paper. Regarding theoretical studies: researchers should be able to
+follow the mathematical proofs, theorems, or calculations presented in a paper, and
+independently arrive at the same results. This requires clear and well-documented
+mathematical reasoning.
+Scale: 1 – Not reproducible
+2 – Flawed/weak
+3 – Partially reproducible
+4 – Entirely reproducible
+Scores: 1, 1.5, 2, 2.5, 3, 3.5, 4
+• Impact (Advance). Determining the impact of a scientific paper is multifaceted and
+contextual. Where does the paper stand in relation to other works? Does the paper represent
+a small step forward or it just refines known theories or methods? Does it propose a novel
+application of an existing method?
+Scale: 1 - Small incremental advance (refined known methods or theories with improved
+efficiency and accuracy, novel applications of an existing method);
+2 - Significant Leap (substantially new approach/mechanism/theory that might
+change the way scientists approach certain problems.
+3 - Disruptive Discovery (unveiled/proposed unknown phenomena, radically new
+theories, or challenges to established paradigms).
+Scores: 1, 1.5, 2, 2.5, 3
+• Impact (Originality/Novelty). Originality and Novelty can contrast with Similarity and
+Redundancy. Hence identifying redundancies is important to seek novelties. The work
+should bring forward an innovative perspective, solution, or approach that offers a fresh take
+on an existing problem or opens a new area of investigation.
+Scale: 1 – Non-Novel (irrelevant to the topic/overall the info is redundant)
+2 – Mostly Non-Novel (most of the info overlaps with sources)
+3 – Partially Novel (equivalent amount of new and redundant info)
+4 – Mostly Novel (most of the info is new/original)
+5 – Novel (the entire paper has new and original information)
+Scores: 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5
+• Quality of writing (Clarity). This metric expresses the ability to convey the author's
+message in a way that readers easily understand, free from confusion or ambiguity. It
+encompasses conciseness and wordiness, emphasizes simplicity, and the use of
+straightforward language, and relies on logical organization. Are the ideas arranged
+coherently? Do the paragraphs and sections flow smoothly and maintain a well-structured
+narrative? Is the language precise? Clear writing is specific and exact in its choice of words,
+eliminating vagueness or ambiguity. It may employ visual aids when relevant, such as
+headings, lists, and graphics to enhance organization and general understanding.
+Scale: 1 – I do not understand why the research has been performed
+2 – Writing is vague or wordy, readability is low
+3 – Ideas are well-arranged, and writing is concise, re-reading several sentences
+is crucial and slows down the reading pace
+4 – Ideas are arranged coherently, writing is specific, language is straightforward,
+overall, the reading pace is fast
+Scores: 1, 1.5, 2, 2.5, 3, 3.5, 4
+Quality of writing (Grammar/Synthax). Quality and clarity of writing must adhere to
+proper grammar, punctuation, and syntax, free from errors, typos, and issues like sentence
+fragments.
+Scale: 1 – The paper contains ≥ 5 issues
+2 – The paper contains 1 to 4 issues
+3 – The paper does not contain issues
+Scores: 1, 1.5, 2, 2.5, 3
+
+• Fairness of writing. Assess how researchers present new information. Do they present
+results without overstating or understating their significance? Do the authors make selective
+reporting by highlighting only the positive or significant results while downplaying or
+omitting non-significant/contradictory results? Do they over-generalize by drawing
+conclusions that are too broad based on a limited or specific sample? Do they use sensational
+language or mark grand claims to make the results appear more impactful or revolutionary
+than they truly are? By applying the precautionary principle, oversized claims are
+considered worse than undersized claims.
+Scale: 1 – The claims are oversized
+2 – The claims are undersized
+3 – The claims are appropriate
+Scores: 1, 1.5, 2, 2.5, 3
+• Interdisciplinarity. Assess the breadth of the paper in terms of the range of disciplines
+engaged with, and the audiences it addresses. Do the keywords span multiple academic
+disciplines, or do they primarily belong to one field? Do the authors use methodologies and
+approaches from more disciplines? Do they cite literature from multiple disciplines? Do they
+discuss implications or applications across various fields? Do they perform comparative
+analyses? A truly interdisciplinary paper integrates knowledge, methods, and perspectives
+from multiple fields. What is the declared audience of the journal?
+Scale: 1 – Monodisciplinary (narrow focus, highly technical language, very specific
+audience)
+2 – Multidisciplinary (multiple disciplines treated in parallel and without a true
+integration, references from multiple disciplines are segmented by section or topic)
+3 – Interdisciplinary (synthesis of approaches or integrated approaches, broader focus,
+references from various disciplines are mingled throughout the paper, methodologies are
+from different fields)
+4 – Transdisciplinary (paper seeks to transcend disciplines, leads to new frameworks,
+theories, or methodologies that do not fit into established categories, it redefines
+disciplinary boundaries)
+Scores: 1, 1.5, 2, 2.5, 3, 3.5, 4
+
+QUALITATIVE:
+Write at least half a page, not more than a page, highlighting the type of
+research read (e.g., theoretical paper, experimental, computational, mix), strengths and
+weaknesses, core audience, and level of interdisciplinarity, readability, and engagement level
+while reading, overall significance and relevance to the core audience, if they would recommend
+reading the paper and to whom and expected impact.
+
+Workflow
+
+Step 0: Preflight
+- Identify paper_type and main claims.
+
+Step 1: Formal correctness/soundness
+- Verify assumptions are explicit; key steps justified; boundary conditions stated.
+- Check units, limits, and special cases where relevant.
+- For experiments: check statistical treatment and error propagation.
+
+Step 2: Reproducibility
+- Experimental: instrumentation, calibration, sample prep, configurations, analysis pipeline, raw/processed data availability.
+- Computational: code repo/commit, environment, seeds, datasets, hyperparameters.
+- Theoretical: clearly stated lemmas, theorem statements, stepwise derivations, defined notation.
+
+Step 3: Impact and novelty
+- Compare approach vs. standard baselines or canonical theories.
+- Identify if contribution is method, result, dataset, instrument, or synthesis.
+
+Step 4: Writing quality and fairness
+- Clarity: structure, signposting, definitions, figures’ self-containment.
+- Grammar/Consistency: terminology, symbols, formatting consistent?
+- Fairness: oversized/undersized claims; selective reporting; hype words.
+
+Step 5: Interdisciplinarity
+- Look for integrated methods/citations across fields, not just mentioning them.
+- Identify breadth of audience and actual integration level.
+
+Step 6: Summarize and request missing items
+- Provide concrete, minimal requests (e.g., “Provide code + environment.yml”).
+- Set reviewer confidence.
+
+
+Bias and COI guardrails
+- Do not infer identity attributes or weigh prestige. Ignore affiliations, personal/professional for scoring.
+
+Weighting and aggregation
+Weights (sum = 1.0):
+- formal_correctness_soundness 0.25
+- reproducibility 0.20
+- impact_advance 0.15
+- impact_originality_novelty 0.15
+- writing_clarity 0.10
+- writing_grammar_syntax 0.05
+- writing_consistency 0.05
+- fairness_of_writing 0.025
+- interdisciplinarity 0.025
+
+Normalization per metric = score / max_scale_for_metric
+Overall = 100 × Σ(weights[m] × normalized_score[m])
+Implement weights_override if provided in input.
+
+example:
+{"model": "reviews.review", "pk": 5, "fields": {"paper": 27987, "reviewer": 18, "status": "pending", "formal_correctness": 4.0, "reproducibility": 4.0, "impact": 2.5, "novelty": 4.5, "writing_clarity": 4.0, "writing_grammar": 3.0, "writing_fairness": 0.0, "interdisciplinarity": 2.0, "confidence": 7.5, "review_text": "The paper \"Generation and Detection of Spin-Orbit Coupled Neutron Beams\" by D. Sarenac et al. presents an experimental study on the generation and characterization of neutron beams with spin-orbit coupling. The authors introduce a novel technique for generating spin-orbit coupled neutron beams using 3He spin filters and specifically oriented triangular coils (LOV prism pairs). This experimental setup, based on a previous theoretical study by the same group, effectively demonstrates the feasibility of controlling spin-OAM correlations in neutron beams. The findings have implications for quantum optics, neutron scattering, and topological materials, bridging concepts from photonics (spin-orbit coupling in light) to neutron physics. This makes the study relevant for researchers in both fields. The paper provides clear visual evidence of spin-dependent intensity profiles, such as checkerboard and doughnut-shaped patterns, which are supported by numerical simulations.\r\n\r\nHowever, the experiment faced limitations due to imperfect magnetic field control between the triangular coils, leading to distortions in the spin-dependent intensity profiles. This highlights the need for improved experimental setups in future work. While the paper emphasizes experimental results, it lacks a comprehensive theoretical framework for spin-orbit coupling in neutron beams.", "review_date": "2025-09-01"}},
+Cite section/figure/equation numbers in evidence items when available.
