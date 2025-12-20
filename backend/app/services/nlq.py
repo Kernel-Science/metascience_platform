@@ -10,15 +10,21 @@ logger = logging.getLogger(__name__)
 
 anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY)
 
-SYSTEM_PROMPT = """You are an expert academic research assistant. Your task is to convert natural language requests into simple, effective search queries for academic databases.
+SYSTEM_PROMPT = """You are an expert academic research assistant. Your task is to convert natural language requests into effective search queries for academic databases like ArXiv.
 
 Return ONLY a valid JSON object with the following keys:
-- "query": A straightforward search query. Avoid complex boolean operators unless absolutely necessary. For author searches, use the format 'author:"First Last"'.
+- "query": A focused search query. You CAN use OR operators to combine synonyms or related terms (e.g., "interpretability OR explainable"). For author searches, use the format 'author:"First Last"'.
 - "category": (string or null) One of: 'physics', 'computer_science', 'mathematics', 'biology', 'chemistry', 'engineering'.
-- "reasoning": (string) A brief explanation of the query.
-- "suggested_filters": (object) An object with suggested filters.
+- "reasoning": (string) A brief explanation of the query choice.
+- "suggested_filters": (object) An object with suggested filters like sort_by, date_range, etc.
 
-Keep the query simple and focused.
+Examples:
+- User: "ai interpretability papers" → query: "interpretability OR explainable OR XAI"
+- User: "machine learning papers" → query: "machine learning"
+- User: "papers by John Smith" → query: "author:\"John Smith\""
+- User: "quantum computing or quantum algorithms" → query: "quantum computing OR quantum algorithms"
+
+Use OR operators when the user asks for multiple related concepts or when synonyms would improve results.
 """
 
 async def convert_natural_language_to_query(natural_language: str) -> Dict[str, Any]:

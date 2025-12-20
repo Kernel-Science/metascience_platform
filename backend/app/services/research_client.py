@@ -130,28 +130,31 @@ class AdvancedResearchAPIClient:
                 }
                 if category:
                     arxiv_cat = category_map.get(category, category)
+                    
                     # Smart category selection for interdisciplinary topics
+                    # NOTE: ArXiv requires space (not AND) between category and query for OR operators to work
                     if "quantum" in query.lower() and arxiv_cat in ["cs", "physics"]:
-                        q = f"(cat:cs OR cat:quant-ph) AND {query}"
+                        q = f"(cat:cs OR cat:quant-ph) {query}"
                     elif "machine learning" in query.lower() and "cancer" in query.lower():
                         # Cancer detection with ML spans multiple categories
-                        q = f"(cat:cs OR cat:q-bio OR cat:eess.IV) AND {query}"
+                        q = f"(cat:cs OR cat:q-bio OR cat:eess.IV) {query}"
                     elif "machine learning" in query.lower() and arxiv_cat == "cs":
                         # ML papers can be in cs.LG, cs.AI, stat.ML
-                        q = f"(cat:cs.LG OR cat:cs.AI OR cat:stat.ML) AND {query}"
+                        q = f"(cat:cs.LG OR cat:cs.AI OR cat:stat.ML) {query}"
                     elif category == "biology" or "cancer" in query.lower() or "medical" in query.lower():
                         # Biological/medical topics
-                        q = f"(cat:q-bio OR cat:physics.med-ph) AND {query}"
+                        q = f"(cat:q-bio OR cat:physics.med-ph) {query}"
                     else:
-                        q = f"cat:{arxiv_cat} AND {query}"
+                        q = f"cat:{arxiv_cat} {query}"
                 else:
                     # No category specified - search broadly
+                    # NOTE: ArXiv requires space (not AND) between category and query for OR operators to work
                     if "quantum" in query.lower():
-                        q = f"(cat:quant-ph OR cat:cs.ET OR cat:physics.atom-ph) AND {query}"
+                        q = f"(cat:quant-ph OR cat:cs.ET OR cat:physics.atom-ph) {query}"
                     elif "machine learning" in query.lower():
-                        q = f"(cat:cs.LG OR cat:cs.AI OR cat:stat.ML) AND {query}"
+                        q = f"(cat:cs.LG OR cat:cs.AI OR cat:stat.ML) {query}"
                     elif any(term in query.lower() for term in ["cancer", "medical", "disease", "diagnosis"]):
-                        q = f"(cat:q-bio OR cat:physics.med-ph OR cat:cs.CV) AND {query}"
+                        q = f"(cat:q-bio OR cat:physics.med-ph OR cat:cs.CV) {query}"
                     else:
                         q = query
 
