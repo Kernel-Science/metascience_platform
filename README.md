@@ -87,7 +87,7 @@ metascience-platform/
 
 For detailed documentation on each component, please refer to their respective README files:
 - [Frontend Documentation](frontend/README.md)
-- [Backend Documentation](backend/README.md)
+- [Backend Documentation](backend/Readme.md.md)
 
 ## 🤝 Contributing
 Contributions are welcome! Please read the [Contributing Guidelines](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md).
