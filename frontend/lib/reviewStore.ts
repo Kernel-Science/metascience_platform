@@ -115,7 +115,6 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
           return;
         }
 
-        // eslint-disable-next-line no-console
 
       }
     } catch (error) {

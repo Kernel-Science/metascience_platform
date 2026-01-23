@@ -275,10 +275,9 @@ export default function ReviewPage() {
           clearMessages();
         } catch (downloadError) {
           showErrorMessage(
-            `Failed to download PDF: ${
-              downloadError instanceof Error
-                ? downloadError.message
-                : "Unknown error"
+            `Failed to download PDF: ${downloadError instanceof Error
+              ? downloadError.message
+              : "Unknown error"
             }`,
           );
           setLoading(false);
@@ -1083,7 +1082,7 @@ export default function ReviewPage() {
     setEstimatedSeconds(base);
   }, [selectedFile, pdfUrl]);
 
-  const formatTime = (seconds: number) => {
+  const _formatTime = (seconds: number) => {
     if (seconds < 60) return `${seconds}s`;
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;

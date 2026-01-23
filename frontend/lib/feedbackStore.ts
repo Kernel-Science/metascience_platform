@@ -59,8 +59,6 @@ export const useFeedbackStore = create<FeedbackStore>((set) => ({
         throw error;
       }
 
-      // eslint-disable-next-line no-console
-
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Error submitting feedback:", error);

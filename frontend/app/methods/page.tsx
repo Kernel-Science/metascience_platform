@@ -646,15 +646,21 @@ export default function MethodsPage() {
                 </h3>
                 <div className="space-y-4">
                   <div className="text-sm text-foreground/80">
-                    <strong className="block text-foreground mb-1">Error Handling:</strong>
+                    <strong className="block text-foreground mb-1">
+                      Error Handling:
+                    </strong>
                     The system validates file uploads and handles processing errors gracefully
                   </div>
                   <div className="text-sm text-foreground/80">
-                    <strong className="block text-foreground mb-1">Rate Limiting:</strong>
+                    <strong className="block text-foreground mb-1">
+                      Rate Limiting:
+                    </strong>
                     API calls are carefully managed to respect service limits and ensure reliable access
                   </div>
                   <div className="text-sm text-foreground/80">
-                    <strong className="block text-foreground mb-1">Fallback Systems:</strong>
+                    <strong className="block text-foreground mb-1">
+                      Fallback Systems:
+                    </strong>
                     If one data source fails, others can still provide information
                   </div>
                 </div>
@@ -666,15 +672,21 @@ export default function MethodsPage() {
                 </h3>
                 <div className="space-y-4">
                   <div className="text-sm text-foreground/80">
-                    <strong className="block text-foreground mb-1">Code Transparency:</strong>
+                    <strong className="block text-foreground mb-1">
+                      Code Transparency:
+                    </strong>
                     All algorithms and processes are visible in this open-source codebase
                   </div>
                   <div className="text-sm text-foreground/80">
-                    <strong className="block text-foreground mb-1">Configuration Access:</strong>
+                    <strong className="block text-foreground mb-1">
+                      Configuration Access:
+                    </strong>
                     The exact prompts and instructions given to AI systems are publicly available
                   </div>
                   <div className="text-sm text-foreground/80">
-                    <strong className="block text-foreground mb-1">No Hidden Processes:</strong>
+                    <strong className="block text-foreground mb-1">
+                      No Hidden Processes:
+                    </strong>
                     Every step of analysis is logged and can be audited
                   </div>
                 </div>

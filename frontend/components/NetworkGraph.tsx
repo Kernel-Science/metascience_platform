@@ -33,7 +33,9 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
   const citationPapers = useCitationStore((state) => state.citationPapers);
   const setCitationGraph = useCitationStore((state) => state.setCitationGraph);
   // Add setters/readers we'll need to persist networks when manually entering DOIs
-  const setCitationPapers = useCitationStore((state) => state.setCitationPapers);
+  const setCitationPapers = useCitationStore(
+    (state) => state.setCitationPapers,
+  );
   const setPaperId = useCitationStore((state) => state.setPaperId);
   const setPaperTitle = useCitationStore((state) => state.setPaperTitle);
   const storedPaperId = useCitationStore((state) => state.paperId);
@@ -325,43 +327,43 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
         title: paper.title,
         authors: paper.authors
           ? paper.authors.map((author: any) => {
-              // Handle different author formats from backend
-              if (typeof author === "string") {
-                // Simple string format
-                return {
-                  fullName: author,
-                  name: author,
-                };
-              } else if (author.name) {
-                // Object with name field
-                const nameParts = author.name.trim().split(" ");
+            // Handle different author formats from backend
+            if (typeof author === "string") {
+              // Simple string format
+              return {
+                fullName: author,
+                name: author,
+              };
+            } else if (author.name) {
+              // Object with name field
+              const nameParts = author.name.trim().split(" ");
 
-                return {
-                  firstName: nameParts.length > 1 ? nameParts[0] : "",
-                  lastName:
-                    nameParts.length > 1
-                      ? nameParts.slice(1).join(" ")
-                      : nameParts[0],
-                  fullName: author.name,
-                  name: author.name,
-                };
-              } else if (author.FN || author.LN) {
-                // Legacy format with FN/LN fields
-                return {
-                  firstName: author.FN || "",
-                  lastName: author.LN || "",
-                  fullName: `${author.FN || ""} ${author.LN || ""}`.trim(),
-                  orcid: author.orcid,
-                  affiliation: author.affil,
-                };
-              } else {
-                // Fallback for unknown format
-                return {
-                  fullName: "Unknown Author",
-                  name: "Unknown Author",
-                };
-              }
-            })
+              return {
+                firstName: nameParts.length > 1 ? nameParts[0] : "",
+                lastName:
+                  nameParts.length > 1
+                    ? nameParts.slice(1).join(" ")
+                    : nameParts[0],
+                fullName: author.name,
+                name: author.name,
+              };
+            } else if (author.FN || author.LN) {
+              // Legacy format with FN/LN fields
+              return {
+                firstName: author.FN || "",
+                lastName: author.LN || "",
+                fullName: `${author.FN || ""} ${author.LN || ""}`.trim(),
+                orcid: author.orcid,
+                affiliation: author.affil,
+              };
+            } else {
+              // Fallback for unknown format
+              return {
+                fullName: "Unknown Author",
+                name: "Unknown Author",
+              };
+            }
+          })
           : [],
         year: paper.year,
         journal: paper.journal || paper.venue,
@@ -525,9 +527,10 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
         // and title using the first seed paper we can find so saveCitationToSupabase
         // in the page's effect will run.
         if (!storedPaperId) {
-          const seedId = validSeedPaperIds && validSeedPaperIds.length > 0
-            ? validSeedPaperIds[0]
-            : null;
+          const seedId =
+            validSeedPaperIds && validSeedPaperIds.length > 0
+              ? validSeedPaperIds[0]
+              : null;
 
           let seedPaper = null;
 
@@ -546,7 +549,7 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
             setPaperTitle(seedPaper.title || "");
           }
         }
-      } catch (e) {
+      } catch {
         // Ignore store write failures; saving is best-effort here
       }
       // Force physics to run and stabilize layout after graph update
@@ -567,17 +570,17 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
         yearRange:
           allPapersData.length > 0
             ? {
-                min: Math.min(
-                  ...allPapersData
-                    .filter((p: any) => p.year)
-                    .map((p: Article) => p.year),
-                ),
-                max: Math.max(
-                  ...allPapersData
-                    .filter((p: any) => p.year)
-                    .map((p: Article) => p.year),
-                ),
-              }
+              min: Math.min(
+                ...allPapersData
+                  .filter((p: any) => p.year)
+                  .map((p: Article) => p.year),
+              ),
+              max: Math.max(
+                ...allPapersData
+                  .filter((p: any) => p.year)
+                  .map((p: Article) => p.year),
+              ),
+            }
             : null,
       };
 

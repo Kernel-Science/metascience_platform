@@ -54,10 +54,9 @@ export const useSearchStore = create<SearchState>((set, get) => ({
           throw error;
         }
 
-        // eslint-disable-next-line no-console
 
       })(),
-      "saving search to history"
+      "saving search to history",
     );
   },
 
@@ -85,7 +84,7 @@ export const useSearchStore = create<SearchState>((set, get) => ({
           return data || [];
         })(),
         "loading search history",
-        { defaultValue: [] }
+        { defaultValue: [] },
       )) || []
     );
   },

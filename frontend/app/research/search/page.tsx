@@ -17,7 +17,6 @@ const API_BASE_URL = "";
 export default function SearchPage() {
   const router = useRouter();
 
-
   const {
     query,
     setQuery,
@@ -35,23 +34,18 @@ export default function SearchPage() {
     saveAnalysisToSupabase,
   } = useAnalysisStore();
 
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
 
   const [analysisLoadingState, setAnalysisLoadingState] = useState<{
     trends: boolean;
     citations: boolean;
   }>({ trends: false, citations: false });
 
-
   const [showFilters, setShowFilters] = useState(false);
 
-
   const [categories, setCategories] = useState<Record<string, any>>({});
-
 
   const [filters, setFilters] = useState<Filters>({
     category: "",
@@ -60,6 +54,7 @@ export default function SearchPage() {
     yearFrom: "",
     yearTo: "",
   });
+
 
 
   useEffect(() => {
@@ -77,7 +72,7 @@ export default function SearchPage() {
         setCategories(data.categories || {});
       }
     } catch {
-
+      // Ignore error during initialization
     }
   };
 
@@ -115,7 +110,6 @@ export default function SearchPage() {
         query: searchQuery.trim(),
       });
 
-
       if (filters.source !== "all") params.append("source", filters.source);
       if (filters.category) params.append("category", filters.category);
       if (filters.minCitations)
@@ -150,7 +144,6 @@ export default function SearchPage() {
           `Found ${data.papers.length} papers from ${data.sources_used?.join(", ") || "multiple sources"
           }`,
         );
-
 
         clearFilters();
         setQuery("");

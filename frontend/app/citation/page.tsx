@@ -64,8 +64,8 @@ function CitationPageContent() {
         if (dois.length > 0) {
           setSeedDois(dois);
         }
-      } catch (error) {
-        console.error("Error parsing imported papers from sessionStorage:", error);
+      } catch {
+        // Ignore error
       }
     }
   }, [setImportedPapers]);
@@ -100,8 +100,8 @@ function CitationPageContent() {
       (async () => {
         try {
           await saveCitationToSupabase();
-        } catch (error) {
-          console.error("Error saving citation data to Supabase:", error);
+        } catch {
+          // Ignore error
         }
       })();
     }
