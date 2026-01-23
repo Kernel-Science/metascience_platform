@@ -36,7 +36,6 @@ export async function middleware(request: NextRequest) {
   try {
     const {
       data: { user },
-      error,
     } = await supabase.auth.getUser();
 
     const protectedRoutes = [
@@ -69,9 +68,7 @@ export async function middleware(request: NextRequest) {
     }
 
     return response;
-  } catch (error) {
-    console.error("Middleware error:", error);
-
+  } catch {
     return response;
   }
 }
