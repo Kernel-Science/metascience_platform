@@ -33,13 +33,11 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-
   try {
     const {
       data: { user },
       error,
     } = await supabase.auth.getUser();
-
 
     const protectedRoutes = [
       "/research",
@@ -55,16 +53,13 @@ export async function middleware(request: NextRequest) {
 
     const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
 
-
     if (isProtectedRoute && !user) {
       const redirectUrl = new URL("/auth/login", request.url);
       redirectUrl.searchParams.set("next", request.nextUrl.pathname);
       return NextResponse.redirect(redirectUrl);
     }
 
-
     if (isAuthRoute && user && request.nextUrl.pathname !== "/auth/callback") {
-
       if (request.nextUrl.pathname === "/auth/reset-password") {
         return response;
       }

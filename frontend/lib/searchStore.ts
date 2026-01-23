@@ -53,8 +53,6 @@ export const useSearchStore = create<SearchState>((set, get) => ({
         if (error) {
           throw error;
         }
-
-
       })(),
       "saving search to history",
     );

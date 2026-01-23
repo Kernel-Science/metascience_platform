@@ -649,19 +649,22 @@ export default function MethodsPage() {
                     <strong className="block text-foreground mb-1">
                       Error Handling:
                     </strong>
-                    The system validates file uploads and handles processing errors gracefully
+                    The system validates file uploads and handles processing
+                    errors gracefully
                   </div>
                   <div className="text-sm text-foreground/80">
                     <strong className="block text-foreground mb-1">
                       Rate Limiting:
                     </strong>
-                    API calls are carefully managed to respect service limits and ensure reliable access
+                    API calls are carefully managed to respect service limits
+                    and ensure reliable access
                   </div>
                   <div className="text-sm text-foreground/80">
                     <strong className="block text-foreground mb-1">
                       Fallback Systems:
                     </strong>
-                    If one data source fails, others can still provide information
+                    If one data source fails, others can still provide
+                    information
                   </div>
                 </div>
 
@@ -675,13 +678,15 @@ export default function MethodsPage() {
                     <strong className="block text-foreground mb-1">
                       Code Transparency:
                     </strong>
-                    All algorithms and processes are visible in this open-source codebase
+                    All algorithms and processes are visible in this open-source
+                    codebase
                   </div>
                   <div className="text-sm text-foreground/80">
                     <strong className="block text-foreground mb-1">
                       Configuration Access:
                     </strong>
-                    The exact prompts and instructions given to AI systems are publicly available
+                    The exact prompts and instructions given to AI systems are
+                    publicly available
                   </div>
                   <div className="text-sm text-foreground/80">
                     <strong className="block text-foreground mb-1">

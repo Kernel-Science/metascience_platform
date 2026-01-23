@@ -275,9 +275,10 @@ export default function ReviewPage() {
           clearMessages();
         } catch (downloadError) {
           showErrorMessage(
-            `Failed to download PDF: ${downloadError instanceof Error
-              ? downloadError.message
-              : "Unknown error"
+            `Failed to download PDF: ${
+              downloadError instanceof Error
+                ? downloadError.message
+                : "Unknown error"
             }`,
           );
           setLoading(false);

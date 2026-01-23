@@ -55,8 +55,6 @@ export default function SearchPage() {
     yearTo: "",
   });
 
-
-
   useEffect(() => {
     initializeApp();
   }, []);
@@ -132,7 +130,6 @@ export default function SearchPage() {
         setPapers(data.papers);
         setSearchFilters(filters);
 
-
         try {
           await saveSearchToSupabase();
         } catch (error) {
@@ -141,7 +138,8 @@ export default function SearchPage() {
         }
 
         showSuccessMessage(
-          `Found ${data.papers.length} papers from ${data.sources_used?.join(", ") || "multiple sources"
+          `Found ${data.papers.length} papers from ${
+            data.sources_used?.join(", ") || "multiple sources"
           }`,
         );
 
@@ -155,7 +153,7 @@ export default function SearchPage() {
     } catch (err: any) {
       showErrorMessage(
         err.message ||
-        "Search failed. Please check your connection and try again.",
+          "Search failed. Please check your connection and try again.",
       );
     } finally {
       setLoading(false);

@@ -196,12 +196,13 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                   return (
                     <button
                       key={tab.id}
-                      className={`relative flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${isActive
+                      className={`relative flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                        isActive
                           ? "bg-white/90 text-gray-900 dark:bg-gray-900 dark:text-gray-100 shadow-md"
                           : tab.disabled
                             ? "text-gray-400 cursor-not-allowed opacity-50"
                             : "text-gray-700 dark:text-gray-300 hover:bg-white/40 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
-                        }`}
+                      }`}
                       disabled={tab.disabled}
                       onClick={() => handleTabClick(tab.id)}
                       aria-label={`${tab.label} tab`}
@@ -275,12 +276,13 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                 return (
                   <button
                     key={tab.id}
-                    className={`flex items-center space-x-3 px-4 py-3 rounded-full text-sm font-medium transition-all duration-200 ${isActive
+                    className={`flex items-center space-x-3 px-4 py-3 rounded-full text-sm font-medium transition-all duration-200 ${
+                      isActive
                         ? "bg-white/90 text-gray-900 dark:bg-gray-900 dark:text-gray-100 shadow-md"
                         : tab.disabled
                           ? "text-gray-400 cursor-not-allowed opacity-50"
                           : "text-gray-700 dark:text-gray-300 hover:bg-white/40 dark:hover:bg-gray-800"
-                      }`}
+                    }`}
                     disabled={tab.disabled}
                     onClick={() => handleTabClick(tab.id)}
                   >

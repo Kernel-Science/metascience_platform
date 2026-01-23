@@ -203,20 +203,22 @@ function CitationPageContent() {
                   {allNodes.length > 0 && (
                     <div className="flex bg-white dark:bg-gray-700 rounded-lg p-1 shadow-sm border border-gray-200 dark:border-gray-600">
                       <button
-                        className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${viewMode === "network"
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                          viewMode === "network"
                             ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 shadow-sm"
                             : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                          }`}
+                        }`}
                         onClick={() => setViewMode("network")}
                       >
                         <Eye className="w-4 h-4" />
                         <span>Network</span>
                       </button>
                       <button
-                        className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${viewMode === "papers"
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                          viewMode === "papers"
                             ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 shadow-sm"
                             : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                          }`}
+                        }`}
                         onClick={() => setViewMode("papers")}
                       >
                         <List className="w-4 h-4" />

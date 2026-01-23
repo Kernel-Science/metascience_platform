@@ -114,8 +114,6 @@ export const useReviewStore = create<ReviewState>((set, get) => ({
           console.error("Error saving review to Supabase:", error);
           return;
         }
-
-
       }
     } catch (error) {
       // eslint-disable-next-line no-console

@@ -39,7 +39,6 @@ export const useFeedbackStore = create<FeedbackStore>((set) => ({
     try {
       const supabase = createClient();
 
-
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -58,7 +57,6 @@ export const useFeedbackStore = create<FeedbackStore>((set) => ({
       if (error) {
         throw error;
       }
-
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error("Error submitting feedback:", error);
