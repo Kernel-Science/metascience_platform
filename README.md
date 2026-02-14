@@ -4,6 +4,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+Try it here https://metascience.fqxi.org
+
 ## 🌟 Overview
 
 The **Metascience Platform** consists of two main components working together:
