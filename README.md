@@ -1,4 +1,4 @@
-# Metascience Platform
+# FQxI Metascience Platform
 
 > A comprehensive open-source research analysis platform combining a modern Next.js frontend with a powerful Python/FastAPI backend to help academics, researchers, and curious individuals understand scientific literature through AI-driven insights and analytics.
 
