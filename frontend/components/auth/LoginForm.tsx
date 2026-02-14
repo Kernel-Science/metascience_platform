@@ -148,13 +148,13 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-4">
-      <Card className="w-full max-w-md p-6">
+    <div className="brand-app-shell flex min-h-screen items-center justify-center p-4">
+      <Card className="brand-surface w-full max-w-md rounded-3xl p-6">
         <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold">
+          <h1 className="brand-heading text-2xl text-foreground">
             {isLogin ? "Sign In" : "Sign Up"}
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="mt-2 text-foreground/72">
             {isLogin ? "Welcome back!" : "Create your account"}
           </p>
         </div>
@@ -199,7 +199,7 @@ export default function LoginForm() {
             <div className="text-right">
               <button
                 type="button"
-                className="text-sm text-primary hover:underline disabled:opacity-50"
+                className="text-sm text-foreground hover:underline disabled:opacity-50"
                 onClick={handleForgotPassword}
                 disabled={loading}
               >
@@ -209,13 +209,13 @@ export default function LoginForm() {
           )}
 
           {error && (
-            <div className="text-red-500 text-sm text-center p-2 bg-red-50 dark:bg-red-900/20 rounded">
+            <div className="rounded bg-red-50 p-2 text-center text-sm text-red-600">
               {error}
             </div>
           )}
 
           {success && (
-            <div className="text-green-500 text-sm text-center p-2 bg-green-50 dark:bg-green-900/20 rounded">
+            <div className="rounded bg-green-50 p-2 text-center text-sm text-green-600">
               {success}
             </div>
           )}
@@ -236,7 +236,7 @@ export default function LoginForm() {
               <div className="w-full border-t border-gray-300" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-background text-gray-500">
+              <span className="bg-[var(--fqxi-paper)] px-2 text-foreground/55">
                 Or continue with
               </span>
             </div>
@@ -272,7 +272,7 @@ export default function LoginForm() {
 
         <div className="mt-6 text-center">
           <button
-            className="text-primary hover:underline disabled:opacity-50"
+            className="text-foreground hover:underline disabled:opacity-50"
             type="button"
             onClick={() => setIsLogin(!isLogin)}
             disabled={loading}

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { Button } from "@heroui/button";
 import { Avatar } from "@heroui/avatar";
@@ -15,7 +16,6 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/context";
 
-import { Logo } from "@/components/icons";
 import { Article } from "@/types";
 
 interface HeaderProps {
@@ -90,9 +90,9 @@ export const Header: React.FC<HeaderProps> = ({
             onPress={() => router.push("/")}
             aria-label="Metascience home"
           >
-            <Logo />
-            <span className="font-bold text-lg text-gray-900 dark:text-gray-100 hidden sm:inline">
-              Metascience
+            <Image src="/FQXILogo.svg" alt="FQxI" width={70} height={36} />
+            <span className="font-bold text-sm tracking-[0.16em] text-gray-900 dark:text-gray-100 hidden sm:inline">
+              METASCIENCE
             </span>
           </Button>
           {minimal ? (

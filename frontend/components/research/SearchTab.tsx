@@ -99,6 +99,9 @@ export const SearchTab: React.FC<SearchTabProps> = ({
     });
   }, [papers.length]);
 
+  const filterControlClassName =
+    "w-full rounded-lg border border-[var(--fqxi-border)] bg-[var(--fqxi-paper)] px-3 py-2 text-[var(--fqxi-ink)] outline-none transition-colors placeholder:text-[var(--fqxi-ink-muted)] focus:border-[var(--fqxi-yellow)] focus:ring-2 focus:ring-[color:rgba(228,211,68,0.35)]";
+
   return (
     <motion.div
       animate={{ opacity: 1, y: 0 }}
@@ -116,10 +119,18 @@ export const SearchTab: React.FC<SearchTabProps> = ({
             <div className="space-y-3">
               <Input
                 className="w-full text-lg"
+                classNames={{
+                  inputWrapper:
+                    "border border-[var(--fqxi-border)] bg-[var(--fqxi-paper)] shadow-none transition-colors hover:bg-[var(--fqxi-paper)] focus-within:border-[var(--fqxi-yellow)] focus-within:ring-2 focus-within:ring-[color:rgba(228,211,68,0.35)]",
+                  input:
+                    "text-[var(--fqxi-ink)] placeholder:text-[var(--fqxi-ink-muted)]",
+                }}
                 disabled={loading || isConverting}
                 placeholder="Describe what you're looking for in natural language - our AI will optimize your search and apply relevant filters automatically"
                 size="lg"
-                startContent={<Search className="w-5 h-5 text-gray-400" />}
+                startContent={
+                  <Search className="h-5 w-5 text-[var(--fqxi-ink-muted)]" />
+                }
                 type="text"
                 value={naturalLanguageQuery}
                 onChange={(e) => setNaturalLanguageQuery(e.target.value)}
@@ -135,7 +146,7 @@ export const SearchTab: React.FC<SearchTabProps> = ({
               />
               <div className="flex items-center justify-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                 <span className="inline-flex items-center space-x-1">
-                  <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--fqxi-yellow)]" />
                   <span>AI-powered search</span>
                 </span>
                 <span>•</span>
@@ -370,7 +381,7 @@ export const SearchTab: React.FC<SearchTabProps> = ({
                     Category
                   </label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={filterControlClassName}
                     id="category-select"
                     value={filters.category}
                     onChange={(e) =>
@@ -394,7 +405,7 @@ export const SearchTab: React.FC<SearchTabProps> = ({
                     Source
                   </label>
                   <select
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={filterControlClassName}
                     id="source-select"
                     value={filters.source}
                     onChange={(e) =>
@@ -416,7 +427,7 @@ export const SearchTab: React.FC<SearchTabProps> = ({
                     Min Citations
                   </label>
                   <input
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={filterControlClassName}
                     id="min-citations-input"
                     min="0"
                     placeholder="e.g., 10"
@@ -436,7 +447,7 @@ export const SearchTab: React.FC<SearchTabProps> = ({
                     Year From
                   </label>
                   <input
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={filterControlClassName}
                     id="year-from-input"
                     max="2025"
                     min="1900"
@@ -457,7 +468,7 @@ export const SearchTab: React.FC<SearchTabProps> = ({
                     Year To
                   </label>
                   <input
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className={filterControlClassName}
                     id="year-to-input"
                     max="2025"
                     min="1900"

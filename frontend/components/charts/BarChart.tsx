@@ -9,7 +9,11 @@ interface BarChartProps {
 
 const BarChart: React.FC<BarChartProps> = ({ data, title }) => {
   if (!data || data.length === 0) {
-    return <p>No data available for {title}.</p>;
+    return (
+      <p className="text-[var(--fqxi-ink-muted)]">
+        No data available for {title}.
+      </p>
+    );
   }
 
   // Validate and clean the data
@@ -24,29 +28,37 @@ const BarChart: React.FC<BarChartProps> = ({ data, title }) => {
   );
 
   if (cleanData.length === 0) {
-    return <p>No valid data available for {title}.</p>;
+    return (
+      <p className="text-[var(--fqxi-ink-muted)]">
+        No valid data available for {title}.
+      </p>
+    );
   }
 
   const maxCount = Math.max(...cleanData.map((item) => item.count), 1);
 
   return (
     <div>
-      {title && <h4 className="text-lg font-semibold mb-2">{title}</h4>}
+      {title && (
+        <h4 className="mb-2 text-lg font-semibold text-[var(--fqxi-ink)]">
+          {title}
+        </h4>
+      )}
       <div className="space-y-2">
         {cleanData.map((item, index) => (
           <div
             key={`${item.name}-${index}`}
             className="flex items-center space-x-2"
           >
-            <div className="w-32 text-sm text-gray-700 dark:text-gray-300 truncate">
+            <div className="w-36 truncate text-sm text-[var(--fqxi-ink-muted)]">
               {item.name}
             </div>
-            <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-4 relative">
+            <div className="relative h-4 flex-1 rounded-full border border-[var(--fqxi-border)] bg-[var(--fqxi-paper-soft)]">
               <div
-                className="bg-blue-500 h-4 rounded-full transition-all duration-300"
+                className="h-4 rounded-full bg-[var(--fqxi-yellow)] transition-all duration-300"
                 style={{ width: `${(item.count / maxCount) * 100}%` }}
               />
-              <span className="absolute right-2 top-0 text-xs text-gray-600 dark:text-gray-300 leading-4">
+              <span className="absolute right-2 top-0 text-xs leading-4 text-[var(--fqxi-ink)]">
                 {item.count}
               </span>
             </div>

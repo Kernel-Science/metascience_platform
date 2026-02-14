@@ -1,8 +1,9 @@
 export type SiteConfig = typeof siteConfig;
 
 export const siteConfig = {
-  name: "Metascience Platform",
-  description: "Scientific research platform.",
+  name: "FQxI Metascience Platform",
+  description:
+    "Metascience tools for mapping and understanding scientific knowledge.",
   navItems: [
     {
       label: "Home",

@@ -122,7 +122,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ onItemLoad }) => {
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col justify-center items-center py-12"
+        className="flex flex-col justify-center items-center py-12 mt-20"
       >
         <Spinner size="lg" color="primary" />
         <p className="mt-4 text-default-500">Loading your history...</p>
@@ -276,8 +276,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ onItemLoad }) => {
                             >
                               <div className="p-2 md:p-3 bg-default-100 rounded-xl group-hover:bg-default-200 transition-colors flex-shrink-0">
                                 <TypeIcon
-                                  className={`w-5 h-5 md:w-6 md:h-6 ${
-                                    typeColor === "primary"
+                                  className={`w-5 h-5 md:w-6 md:h-6 ${typeColor === "primary"
                                       ? "text-primary-600"
                                       : typeColor === "success"
                                         ? "text-success-600"
@@ -286,7 +285,7 @@ export const HistoryTab: React.FC<HistoryTabProps> = ({ onItemLoad }) => {
                                           : typeColor === "warning"
                                             ? "text-warning-600"
                                             : "text-default-600"
-                                  }`}
+                                    }`}
                                 />
                               </div>
                             </Badge>

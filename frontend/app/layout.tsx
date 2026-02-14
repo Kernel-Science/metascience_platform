@@ -22,8 +22,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "white" },
-    { media: "(prefers-color-scheme: dark)", color: "black" },
+    { media: "(prefers-color-scheme: light)", color: "#FCFCF7" },
+    { media: "(prefers-color-scheme: dark)", color: "#1D1D1B" },
   ],
 };
 
@@ -35,15 +35,21 @@ export default function RootLayout({
   return (
     <html suppressHydrationWarning lang="en">
       <head>
-        <title>Metascience</title>
+        <title>FQxI Metascience Platform</title>
       </head>
       <body
         className={clsx(
-          "min-h-screen bg-background font-sans antialiased",
+          "min-h-screen font-sans antialiased text-foreground",
           fontSans.variable,
         )}
       >
-        <Providers themeProps={{ attribute: "class", defaultTheme: "light" }}>
+        <Providers
+          themeProps={{
+            attribute: "class",
+            defaultTheme: "light",
+            enableSystem: false,
+          }}
+        >
           <FeedbackProvider>
             <div className="relative flex flex-col min-h-screen">
               <main className="flex-1">{children}</main>

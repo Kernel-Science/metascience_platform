@@ -131,7 +131,7 @@ function CitationPageContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <div className="brand-app-shell">
       <Navbar />
 
       <main className="container mx-auto px-6 py-24 max-w-7xl">
@@ -140,10 +140,10 @@ function CitationPageContent() {
           {/* Sidebar Controls */}
           <div className="col-span-12 lg:col-span-3 space-y-6">
             {/* Search Section */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+            <div className="brand-surface rounded-2xl p-6">
               <div className="flex items-center space-x-3 mb-4">
-                <BookOpen className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                <BookOpen className="h-5 w-5 text-foreground" />
+                <h2 className="text-lg font-semibold text-foreground">
                   Find Paper
                 </h2>
               </div>
@@ -156,10 +156,10 @@ function CitationPageContent() {
             </div>
 
             {/* Analysis Options */}
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 border border-gray-200 dark:border-gray-700">
+            <div className="brand-surface rounded-2xl p-6">
               <div className="flex items-center space-x-3 mb-4">
-                <Settings className="w-5 h-5 text-green-600 dark:text-green-400" />
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                <Settings className="h-5 w-5 text-foreground" />
+                <h2 className="text-lg font-semibold text-foreground">
                   Configuration
                 </h2>
               </div>
@@ -171,11 +171,11 @@ function CitationPageContent() {
 
             {/* Help Button */}
             <button
-              className="w-full bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-900/30 dark:hover:to-pink-900/30 border border-purple-200 dark:border-purple-800 rounded-2xl p-4 flex items-center justify-center space-x-3 transition-all duration-200 transform hover:scale-105"
+              className="flex w-full items-center justify-center space-x-3 rounded-2xl border border-foreground/20 bg-[#E4D344]/45 p-4 text-foreground transition-all duration-200 hover:bg-[#E4D344]/60"
               onClick={() => setShowFAQ(!showFAQ)}
             >
-              <HelpCircle className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              <span className="font-medium text-purple-700 dark:text-purple-300">
+              <HelpCircle className="h-5 w-5 text-foreground" />
+              <span className="font-medium text-foreground">
                 {showFAQ ? "Hide Help" : "Show Help"}
               </span>
             </button>
@@ -183,16 +183,16 @@ function CitationPageContent() {
 
           {/* Main Visualization Area */}
           <div className="col-span-12 lg:col-span-9 space-y-6">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-8 py-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="brand-surface overflow-hidden rounded-2xl">
+              <div className="border-b border-foreground/12 bg-[#E4D344]/25 px-8 py-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                    <h2 className="mb-2 text-2xl font-bold text-foreground">
                       {viewMode === "network"
                         ? "Citation Network"
                         : "Network Papers"}
                     </h2>
-                    <p className="text-gray-600 dark:text-gray-300">
+                    <p className="text-foreground/75">
                       {viewMode === "network"
                         ? "Interactive network visualization. Seed papers are indigo, cited papers are purple, and citing papers are cyan."
                         : `${allNodes.length} papers found in the citation network`}
@@ -201,12 +201,12 @@ function CitationPageContent() {
 
                   {/* View Toggle Buttons */}
                   {allNodes.length > 0 && (
-                    <div className="flex bg-white dark:bg-gray-700 rounded-lg p-1 shadow-sm border border-gray-200 dark:border-gray-600">
+                    <div className="flex rounded-lg border border-foreground/18 bg-content1/80 p-1 shadow-sm">
                       <button
                         className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                           viewMode === "network"
-                            ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 shadow-sm"
-                            : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                            ? "bg-foreground text-background shadow-sm"
+                            : "text-foreground/65 hover:text-foreground"
                         }`}
                         onClick={() => setViewMode("network")}
                       >
@@ -216,8 +216,8 @@ function CitationPageContent() {
                       <button
                         className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                           viewMode === "papers"
-                            ? "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 shadow-sm"
-                            : "text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                            ? "bg-foreground text-background shadow-sm"
+                            : "text-foreground/65 hover:text-foreground"
                         }`}
                         onClick={() => setViewMode("papers")}
                       >
@@ -264,12 +264,12 @@ function CitationPageContent() {
 
             {/* Selected Paper Details - Horizontal layout at bottom */}
             {selectedNode && (
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-                <div className="bg-gradient-to-r from-orange-50 to-amber-50 dark:from-orange-900/20 dark:to-amber-900/20 px-8 py-4 border-b border-gray-200 dark:border-gray-700">
-                  <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+              <div className="brand-surface overflow-hidden rounded-2xl">
+                <div className="border-b border-foreground/12 bg-[#E4D344]/22 px-8 py-4">
+                  <h2 className="text-xl font-bold text-foreground">
                     Selected Paper Details
                   </h2>
-                  <p className="text-gray-600 dark:text-gray-300 text-sm">
+                  <p className="text-sm text-foreground/75">
                     Detailed information about the selected paper from the
                     network
                   </p>
@@ -326,19 +326,19 @@ function CitationPageContent() {
 
         {/* FAQ Section - Only show when toggled */}
         {showFAQ && (
-          <div className="mt-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 px-8 py-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="brand-surface mt-8 overflow-hidden rounded-2xl">
+            <div className="border-b border-foreground/12 bg-[#E4D344]/25 px-8 py-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+                  <h2 className="mb-2 text-2xl font-bold text-foreground">
                     Frequently Asked Questions
                   </h2>
-                  <p className="text-gray-600 dark:text-gray-300">
+                  <p className="text-foreground/75">
                     Everything you need to know about citation network analysis
                   </p>
                 </div>
                 <button
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  className="rounded-full p-2 text-foreground/55 transition-colors hover:bg-foreground/10 hover:text-foreground"
                   onClick={() => setShowFAQ(false)}
                 >
                   ✕

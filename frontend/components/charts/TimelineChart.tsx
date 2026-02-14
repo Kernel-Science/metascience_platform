@@ -14,7 +14,11 @@ interface TimelineChartProps {
 
 const TimelineChart: React.FC<TimelineChartProps> = ({ data }) => {
   if (!data || data.length === 0) {
-    return <p>No timeline data available.</p>;
+    return (
+      <p className="text-[var(--fqxi-ink-muted)]">
+        No timeline data available.
+      </p>
+    );
   }
 
   // Validate and clean the data
@@ -32,7 +36,11 @@ const TimelineChart: React.FC<TimelineChartProps> = ({ data }) => {
   );
 
   if (cleanData.length === 0) {
-    return <p>No valid timeline data available.</p>;
+    return (
+      <p className="text-[var(--fqxi-ink-muted)]">
+        No valid timeline data available.
+      </p>
+    );
   }
 
   // Safe calculations with fallbacks
@@ -43,33 +51,36 @@ const TimelineChart: React.FC<TimelineChartProps> = ({ data }) => {
 
   // Ensure we have a valid year range
   const yearRange = Math.max(maxYear - minYear, 1); // Ensure at least 1 to avoid division by zero
+  const papersColor = "var(--fqxi-ink)";
+  const citationsColor = "#e4d344";
+  const gridColor = "var(--fqxi-border)";
+  const textColor = "var(--fqxi-ink-muted)";
 
   return (
     <div className="w-full">
       <div className="flex items-center justify-between mb-4">
-        <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+        <h4 className="text-lg font-semibold text-[var(--fqxi-ink)]">
           Timeline Analysis
         </h4>
-        <div className="flex space-x-4 text-sm text-gray-700 dark:text-gray-300">
+        <div className="flex space-x-4 text-sm text-[var(--fqxi-ink-muted)]">
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-full" />
+            <div className="h-3 w-3 rounded-full bg-[#1d1d1b] dark:bg-[#f3f2ec]" />
             <span>Papers</span>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 bg-green-500 rounded-full" />
+            <div className="h-3 w-3 rounded-full bg-[#e4d344]" />
             <span>Citations</span>
           </div>
         </div>
       </div>
 
-      <div className="relative h-64 bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+      <div className="relative h-64 rounded-lg border border-[var(--fqxi-border)] bg-[var(--fqxi-paper-soft)] p-4">
         <svg className="w-full h-full" viewBox="0 0 800 200">
           {/* Grid lines */}
           {[0, 25, 50, 75, 100].map((y) => (
             <line
               key={y}
-              className="dark:stroke-gray-700"
-              stroke="#e5e7eb"
+              stroke={gridColor}
               strokeWidth="1"
               x1="50"
               x2="750"
@@ -80,7 +91,8 @@ const TimelineChart: React.FC<TimelineChartProps> = ({ data }) => {
 
           {/* Y-axis labels */}
           <text
-            className="text-xs fill-gray-600 dark:fill-gray-400"
+            className="text-xs"
+            fill={textColor}
             textAnchor="middle"
             x="20"
             y="30"
@@ -88,7 +100,8 @@ const TimelineChart: React.FC<TimelineChartProps> = ({ data }) => {
             High
           </text>
           <text
-            className="text-xs fill-gray-600 dark:fill-gray-400"
+            className="text-xs"
+            fill={textColor}
             textAnchor="middle"
             x="20"
             y="100"
@@ -96,7 +109,8 @@ const TimelineChart: React.FC<TimelineChartProps> = ({ data }) => {
             Med
           </text>
           <text
-            className="text-xs fill-gray-600 dark:fill-gray-400"
+            className="text-xs"
+            fill={textColor}
             textAnchor="middle"
             x="20"
             y="170"
@@ -142,7 +156,7 @@ const TimelineChart: React.FC<TimelineChartProps> = ({ data }) => {
                       return (
                         <>
                           <line
-                            stroke="#3b82f6"
+                            stroke={papersColor}
                             strokeWidth="2"
                             x1={safeX}
                             x2={safeNextX}
@@ -150,7 +164,7 @@ const TimelineChart: React.FC<TimelineChartProps> = ({ data }) => {
                             y2={safeNextPapersY}
                           />
                           <line
-                            stroke="#10b981"
+                            stroke={citationsColor}
                             strokeWidth="2"
                             x1={safeX}
                             x2={safeNextX}
@@ -164,12 +178,18 @@ const TimelineChart: React.FC<TimelineChartProps> = ({ data }) => {
                 )}
 
                 {/* Data points */}
-                <circle cx={safeX} cy={safePapersY} fill="#3b82f6" r="4" />
-                <circle cx={safeX} cy={safeCitationsY} fill="#10b981" r="4" />
+                <circle cx={safeX} cy={safePapersY} fill={papersColor} r="4" />
+                <circle
+                  cx={safeX}
+                  cy={safeCitationsY}
+                  fill={citationsColor}
+                  r="4"
+                />
 
                 {/* Year labels */}
                 <text
-                  className="text-xs fill-gray-600 dark:fill-gray-400"
+                  className="text-xs"
+                  fill={textColor}
                   textAnchor="middle"
                   x={safeX}
                   y="195"
@@ -189,14 +209,14 @@ const TimelineChart: React.FC<TimelineChartProps> = ({ data }) => {
       <div className="mt-4 overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="bg-gray-100 dark:bg-gray-800">
-              <th className="px-3 py-2 text-left text-gray-900 dark:text-gray-100">
+            <tr className="bg-[var(--fqxi-paper-soft)]">
+              <th className="px-3 py-2 text-left text-[var(--fqxi-ink)]">
                 Year
               </th>
-              <th className="px-3 py-2 text-left text-gray-900 dark:text-gray-100">
+              <th className="px-3 py-2 text-left text-[var(--fqxi-ink)]">
                 Papers
               </th>
-              <th className="px-3 py-2 text-left text-gray-900 dark:text-gray-100">
+              <th className="px-3 py-2 text-left text-[var(--fqxi-ink)]">
                 Citations
               </th>
             </tr>
@@ -205,15 +225,15 @@ const TimelineChart: React.FC<TimelineChartProps> = ({ data }) => {
             {cleanData.map((point) => (
               <tr
                 key={point.year}
-                className="border-b border-gray-200 dark:border-gray-700"
+                className="border-b border-[var(--fqxi-border)]"
               >
-                <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
+                <td className="px-3 py-2 text-[var(--fqxi-ink-muted)]">
                   {point.year}
                 </td>
-                <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
+                <td className="px-3 py-2 text-[var(--fqxi-ink-muted)]">
                   {point.papers}
                 </td>
-                <td className="px-3 py-2 text-gray-700 dark:text-gray-300">
+                <td className="px-3 py-2 text-[var(--fqxi-ink-muted)]">
                   {point.citations}
                 </td>
               </tr>

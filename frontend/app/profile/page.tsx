@@ -206,7 +206,7 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-900/50">
+      <div className="brand-app-shell">
         <Navbar />
 
         <main className="container mx-auto px-6 py-24 max-w-4xl">

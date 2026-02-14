@@ -1,3 +1,108 @@
 @import "tailwindcss";
 
-@config "../tailwind.config.js"
+@config "../tailwind.config.js";
+
+:root {
+  --fqxi-ink: #1d1d1b;
+  --fqxi-ink-muted: rgba(29, 29, 27, 0.72);
+  --fqxi-yellow: #e4d344;
+  --fqxi-surface: rgba(255, 255, 255, 0.84);
+  --fqxi-surface-strong: #fcfcf7;
+  --fqxi-paper: #fcfcf7;
+  --fqxi-paper-soft: #f4f1df;
+  --fqxi-border: rgba(29, 29, 27, 0.14);
+  --fqxi-grid: rgba(29, 29, 27, 0.05);
+  --fqxi-shadow-1: rgba(29, 29, 27, 0.35);
+  --fqxi-shadow-2: rgba(29, 29, 27, 0.25);
+}
+
+.dark {
+  --fqxi-ink: #f3f2ec;
+  --fqxi-ink-muted: rgba(243, 242, 236, 0.74);
+  --fqxi-surface: rgba(24, 24, 22, 0.82);
+  --fqxi-surface-strong: rgba(17, 17, 16, 0.95);
+  --fqxi-paper: #111110;
+  --fqxi-paper-soft: #1b1b18;
+  --fqxi-border: rgba(243, 242, 236, 0.14);
+  --fqxi-grid: rgba(243, 242, 236, 0.08);
+  --fqxi-shadow-1: rgba(0, 0, 0, 0.55);
+  --fqxi-shadow-2: rgba(0, 0, 0, 0.42);
+}
+
+* {
+  border-color: var(--fqxi-border);
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  font-family: "Cormorant Garamond", Garamond, "Times New Roman", serif;
+  background:
+    radial-gradient(circle at 14% 0%, rgba(228, 211, 68, 0.32) 0%, rgba(228, 211, 68, 0) 45%),
+    radial-gradient(circle at 88% 14%, var(--fqxi-grid) 0%, rgba(29, 29, 27, 0) 36%),
+    linear-gradient(180deg, var(--fqxi-paper) 0%, var(--fqxi-paper-soft) 100%);
+  color: var(--fqxi-ink);
+}
+
+::selection {
+  background: rgba(228, 211, 68, 0.55);
+  color: #1d1d1b;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: 0.01em;
+  }
+}
+
+@layer components {
+  .brand-app-shell {
+    position: relative;
+    isolation: isolate;
+    min-height: 100vh;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--fqxi-paper) 92%, transparent) 0%,
+      color-mix(in srgb, var(--fqxi-paper-soft) 96%, transparent) 100%
+    );
+  }
+
+  .brand-app-shell::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background-image:
+      linear-gradient(var(--fqxi-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--fqxi-grid) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.45;
+  }
+
+  .brand-surface {
+    background: var(--fqxi-surface);
+    border: 1px solid var(--fqxi-border);
+    box-shadow:
+      0 18px 45px -24px var(--fqxi-shadow-1),
+      0 8px 20px -16px var(--fqxi-shadow-2);
+    backdrop-filter: blur(8px);
+  }
+
+  .brand-heading {
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .brand-subtitle {
+    font-style: italic;
+    letter-spacing: 0.04em;
+  }
+}

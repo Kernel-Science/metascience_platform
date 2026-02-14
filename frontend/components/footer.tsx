@@ -1,30 +1,37 @@
+import Image from "next/image";
 import Link from "next/link";
 
 export const Footer = () => {
   return (
-    <footer className="w-full border-t border-divider mt-auto">
-      <div className="container mx-auto px-6 py-8">
-        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="text-center md:text-left">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              © {new Date().getFullYear()} Metascience Platform. All rights
-              reserved.
+    <footer className="mt-auto w-full border-t border-foreground/15 bg-content1/65 backdrop-blur-sm">
+      <div className="mx-auto max-w-7xl px-6 py-8">
+        <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">
+          <div>
+            <div className="mb-3 flex items-center gap-3">
+              <Image src="/FQXILogo.svg" alt="FQxI" width={86} height={44} />
+              <p className="text-xs font-semibold tracking-[0.18em] text-foreground/70">
+                METASCIENCE PLATFORM
+              </p>
+            </div>
+            <p className="text-sm text-foreground/78">
+              © {new Date().getFullYear()} FQxI Metascience Platform. All
+              rights reserved.
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-              Developed with ❤️ by Kernel Science SRL
+            <p className="mt-1 text-xs text-foreground/60">
+              Developed by Kernel Science SRL.
             </p>
           </div>
 
-          <div className="flex flex-wrap justify-center gap-6">
+          <div className="flex flex-wrap gap-5 text-sm text-foreground/78">
             <Link
               href="/privacy"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:underline"
+              className="hover:text-foreground hover:underline"
             >
               Privacy Policy
             </Link>
             <Link
               href="/terms"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:underline"
+              className="hover:text-foreground hover:underline"
             >
               Terms of Service
             </Link>
@@ -32,18 +39,11 @@ export const Footer = () => {
               href="https://supabase.com/security"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:underline"
+              className="hover:text-foreground hover:underline"
             >
               Security
             </a>
           </div>
-        </div>
-
-        <div className="mt-6 pt-6 border-t border-divider">
-          <p className="text-xs text-center text-gray-500 dark:text-gray-500">
-            This service uses data from external APIs. We do not sell or share
-            your personal information.
-          </p>
         </div>
       </div>
     </footer>

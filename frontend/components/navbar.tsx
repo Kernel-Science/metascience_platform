@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { Button } from "@heroui/button";
 import { Avatar } from "@heroui/avatar";
@@ -17,8 +18,6 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/context";
 
-import { Logo } from "@/components/icons";
-
 interface NavbarProps {
   minimal?: boolean;
 }
@@ -29,14 +28,14 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const { user, loading } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // Determine active tab from pathname
   const getActiveTab = () => {
     if (pathname.startsWith("/research/search")) return "search";
     if (pathname.startsWith("/research/analysis")) return "analysis";
     if (pathname.startsWith("/research/history")) return "history";
     if (pathname.startsWith("/citation")) return "citation";
     if (pathname.startsWith("/review")) return "review";
-    if (pathname.startsWith("/methods")) return "Methods";
+    if (pathname.startsWith("/methods")) return "methods";
+
     return "";
   };
 
@@ -47,7 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
       router.push("/citation");
     } else if (tabId === "review") {
       router.push("/review");
-    } else if (tabId === "Methods") {
+    } else if (tabId === "methods") {
       router.push("/methods");
     } else if (tabId === "search") {
       router.push("/research/search");
@@ -56,6 +55,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
     } else if (tabId === "history") {
       router.push("/research/history");
     }
+
     setIsMobileMenuOpen(false);
   };
 
@@ -64,7 +64,6 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
     setIsMobileMenuOpen(false);
   };
 
-  // Navigate to the public home page when clicking the logo
   const handleLogoClick = () => {
     router.push("/");
     setIsMobileMenuOpen(false);
@@ -98,77 +97,75 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
       id: "search",
       label: "Search",
       icon: Search,
-      disabled: false,
     },
     {
       id: "analysis",
       label: "Analysis",
       icon: TrendingUp,
-      disabled: false,
     },
     {
       id: "history",
       label: "History",
       icon: History,
-      disabled: false,
     },
     {
       id: "citation",
       label: "Citation",
       icon: BookText,
-      disabled: false,
     },
     {
       id: "review",
       label: "Paper Assessment",
       icon: FileCheck,
-      disabled: false,
     },
     {
-      id: "Methods",
+      id: "methods",
       label: "Methods",
       icon: Shield,
-      disabled: false,
     },
   ];
 
   return (
-    <header className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 w-[95%] max-w-7xl">
-      <nav className="relative backdrop-blur-md bg-white/20 border border-white/30 rounded-full px-2 py-2 shadow-lg shadow-black/10">
-        <div className="flex items-center justify-between">
-          {/* Logo Section */}
+    <header className="fixed top-4 left-1/2 z-50 w-[95%] max-w-7xl -translate-x-1/2">
+      <nav className="brand-surface rounded-[2rem] px-3 py-2">
+        <div className="flex items-center justify-between gap-2">
           <Button
-            variant="ghost"
-            className="flex items-center space-x-2 px-4 py-2 rounded-full hover:bg-white/20"
+            variant="light"
+            className="flex h-auto items-center gap-3 rounded-[1.2rem] px-4 py-2 text-foreground hover:bg-[#E4D344]/40"
             onPress={handleLogoClick}
-            aria-label="Metascience home"
+            aria-label="FQxI Metascience home"
           >
-            <Logo />
-            <span className="font-bold text-lg text-gray-900 dark:text-gray-100 hidden sm:inline">
-              Metascience
+            <Image
+              src="/FQXILogo.svg"
+              alt="FQxI"
+              width={78}
+              height={40}
+              priority
+            />
+            <span className="hidden text-sm font-semibold tracking-[0.18em] sm:inline">
+              METASCIENCE
             </span>
           </Button>
 
           {minimal ? (
             <div className="flex items-center space-x-2">
               <Button
-                className="bg-gray-900 text-white px-6 py-2 rounded-full font-semibold hover:bg-gray-800 transition-colors"
+                className="rounded-full border border-foreground/75 bg-[#E4D344] px-6 py-2 font-semibold text-[#1D1D1B] hover:bg-[#d8c63f]"
                 onPress={handleGoToApp}
               >
-                Go to app
+                Go to App
               </Button>
-              {/* Auth buttons for minimal header */}
               {!loading &&
                 (user ? (
                   <Button
                     isIconOnly
                     aria-label={`User profile: ${user.email}`}
                     className="rounded-full"
-                    variant="ghost"
+                    variant="light"
                     onPress={handleProfileClick}
                   >
                     <Avatar
-                      className="w-6 h-6"
+                      className="h-6 w-6"
                       name={getInitials(user.email || "")}
                       size="sm"
                       src={getProfilePicture()}
@@ -176,19 +173,18 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                   </Button>
                 ) : (
                   <Button
-                    variant="ghost"
-                    className="rounded-full"
+                    variant="light"
+                    className="rounded-full border border-foreground/25 text-foreground"
                     onPress={handleSignIn}
                   >
-                    <User className="w-4 h-4" />
-                    <span className="hidden sm:inline ml-1">Sign In</span>
+                    <User className="h-4 w-4" />
+                    <span className="ml-1 hidden sm:inline">Sign In</span>
                   </Button>
                 ))}
             </div>
           ) : (
             <>
-              {/* Desktop Navigation Tabs */}
-              <div className="hidden lg:flex items-center space-x-2">
+              <div className="hidden items-center gap-2 lg:flex">
                 {navItems.map((tab) => {
                   const Icon = tab.icon;
                   const isActive = activeTab === tab.id;
@@ -196,54 +192,49 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                   return (
                     <button
                       key={tab.id}
-                      className={`relative flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+                      className={`flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold tracking-[0.04em] transition-all duration-200 ${
                         isActive
-                          ? "bg-white/90 text-gray-900 dark:bg-gray-900 dark:text-gray-100 shadow-md"
-                          : tab.disabled
-                            ? "text-gray-400 cursor-not-allowed opacity-50"
-                            : "text-gray-700 dark:text-gray-300 hover:bg-white/40 dark:hover:bg-gray-800 hover:text-gray-900 dark:hover:text-gray-100"
+                          ? "bg-foreground text-background"
+                          : "text-foreground/80 hover:bg-[#E4D344]/40 hover:text-foreground"
                       }`}
-                      disabled={tab.disabled}
                       onClick={() => handleTabClick(tab.id)}
                       aria-label={`${tab.label} tab`}
                     >
-                      <Icon className="w-4 h-4" />
+                      <Icon className="h-4 w-4" />
                       <span className="hidden xl:inline">{tab.label}</span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* Mobile Menu Button */}
-              <div className="lg:hidden flex items-center space-x-2">
+              <div className="flex items-center space-x-2 lg:hidden">
                 <Button
                   isIconOnly
-                  className="rounded-full"
-                  variant="ghost"
+                  className="rounded-full border border-foreground/20 text-foreground"
+                  variant="light"
                   onPress={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
                   aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
                 >
                   {isMobileMenuOpen ? (
-                    <X className="w-5 h-5" />
+                    <X className="h-5 w-5" />
                   ) : (
-                    <Menu className="w-5 h-5" />
+                    <Menu className="h-5 w-5" />
                   )}
                 </Button>
               </div>
 
-              {/* User Profile Avatar or Sign In (Desktop) */}
               {!loading && (
-                <div className="hidden lg:flex items-center pl-2">
+                <div className="hidden items-center pl-2 lg:flex">
                   {user ? (
                     <Button
                       isIconOnly
-                      className="rounded-full"
-                      variant="ghost"
+                      className="rounded-full border border-foreground/15"
+                      variant="light"
                       onPress={handleProfileClick}
                       aria-label={`User profile: ${user.email}`}
                     >
                       <Avatar
-                        className="w-7 h-7"
+                        className="h-7 w-7"
                         name={getInitials(user.email || "")}
                         size="sm"
                         src={getProfilePicture()}
@@ -251,12 +242,12 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                     </Button>
                   ) : (
                     <Button
-                      variant="ghost"
-                      className="rounded-full"
+                      variant="light"
+                      className="rounded-full border border-foreground/25 text-foreground"
                       onPress={handleSignIn}
                     >
-                      <User className="w-4 h-4" />
-                      <span className="hidden xl:inline ml-1">Sign In</span>
+                      <User className="h-4 w-4" />
+                      <span className="ml-1 hidden xl:inline">Sign In</span>
                     </Button>
                   )}
                 </div>
@@ -265,10 +256,9 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
           )}
         </div>
 
-        {/* Mobile Menu Dropdown */}
         {!minimal && isMobileMenuOpen && (
-          <div className="absolute top-full left-0 right-0 mt-2 lg:hidden backdrop-blur-xl bg-white/90 dark:bg-gray-900/90 border border-white/30 rounded-3xl px-2 py-4 shadow-lg shadow-black/10">
-            <div className="flex flex-col space-y-2">
+          <div className="brand-surface absolute left-0 right-0 top-full z-20 mt-2 rounded-[1.5rem] p-3 lg:hidden">
+            <div className="flex flex-col gap-2">
               {navItems.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
@@ -276,32 +266,28 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                 return (
                   <button
                     key={tab.id}
-                    className={`flex items-center space-x-3 px-4 py-3 rounded-full text-sm font-medium transition-all duration-200 ${
+                    className={`flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-all duration-200 ${
                       isActive
-                        ? "bg-white/90 text-gray-900 dark:bg-gray-900 dark:text-gray-100 shadow-md"
-                        : tab.disabled
-                          ? "text-gray-400 cursor-not-allowed opacity-50"
-                          : "text-gray-700 dark:text-gray-300 hover:bg-white/40 dark:hover:bg-gray-800"
+                        ? "bg-foreground text-background"
+                        : "text-foreground/80 hover:bg-[#E4D344]/40 hover:text-foreground"
                     }`}
-                    disabled={tab.disabled}
                     onClick={() => handleTabClick(tab.id)}
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className="h-5 w-5" />
                     <span>{tab.label}</span>
                   </button>
                 );
               })}
 
-              {/* Mobile Auth Button */}
               {!loading && (
-                <div className="pt-2 border-t border-white/20">
+                <div className="mt-1 border-t border-foreground/12 pt-2">
                   {user ? (
                     <button
-                      className="flex items-center space-x-3 px-4 py-3 rounded-full text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-white/40 dark:hover:bg-gray-800 w-full transition-all duration-200"
+                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-foreground/80 hover:bg-[#E4D344]/35"
                       onClick={handleProfileClick}
                     >
                       <Avatar
-                        className="w-6 h-6"
+                        className="h-6 w-6"
                         name={getInitials(user.email || "")}
                         size="sm"
                         src={getProfilePicture()}
@@ -310,10 +296,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
                     </button>
                   ) : (
                     <button
-                      className="flex items-center space-x-3 px-4 py-3 rounded-full text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-white/40 dark:hover:bg-gray-800 w-full transition-all duration-200"
+                      className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-foreground/80 hover:bg-[#E4D344]/35"
                       onClick={handleSignIn}
                     >
-                      <User className="w-5 h-5" />
+                      <User className="h-5 w-5" />
                       <span>Sign In</span>
                     </button>
                   )}

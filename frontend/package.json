@@ -42,6 +42,7 @@
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.56.1",
     "chart.js": "^4.5.0",
+    "class-variance-authority": "^0.7.1",
     "clsx": "2.1.1",
     "d3": "^7.9.0",
     "framer-motion": "11.18.2",

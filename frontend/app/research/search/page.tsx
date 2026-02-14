@@ -138,8 +138,7 @@ export default function SearchPage() {
         }
 
         showSuccessMessage(
-          `Found ${data.papers.length} papers from ${
-            data.sources_used?.join(", ") || "multiple sources"
+          `Found ${data.papers.length} papers from ${data.sources_used?.join(", ") || "multiple sources"
           }`,
         );
 
@@ -153,12 +152,47 @@ export default function SearchPage() {
     } catch (err: any) {
       showErrorMessage(
         err.message ||
-          "Search failed. Please check your connection and try again.",
+        "Search failed. Please check your connection and try again.",
       );
     } finally {
       setLoading(false);
     }
   };
+
+  // Track completed analyses so we know when both are done
+  const [completedAnalyses, setCompletedAnalyses] = useState<{
+    trends: boolean;
+    citations: boolean;
+  }>({ trends: false, citations: false });
+
+  // Navigate once both are done (or just one if only one was running)
+  useEffect(() => {
+    const bothLoading =
+      !analysisLoadingState.trends && !analysisLoadingState.citations;
+
+    if (!bothLoading) return; // Still loading something
+
+    const { trends: trendsDone, citations: citationsDone } = completedAnalyses;
+
+    if (trendsDone && citationsDone) {
+      // Both finished — navigate to trends (the richer view) and notify about citations
+      showSuccessMessage(
+        "Both analyses completed! Showing trend analysis. Visit Citation Network from the menu to see citation results.",
+      );
+      setCompletedAnalyses({ trends: false, citations: false });
+      router.push("/research/analysis");
+    } else if (trendsDone) {
+      showSuccessMessage("Trend analysis completed successfully!");
+      setCompletedAnalyses({ trends: false, citations: false });
+      router.push("/research/analysis");
+    } else if (citationsDone) {
+      showSuccessMessage(
+        "Citation analysis completed successfully! Redirecting to citation network...",
+      );
+      setCompletedAnalyses({ trends: false, citations: false });
+      router.push("/citation");
+    }
+  }, [analysisLoadingState, completedAnalyses]);
 
   const analyzeData = async (type: "trends" | "citations") => {
     if (papers.length === 0) {
@@ -167,10 +201,17 @@ export default function SearchPage() {
     }
 
     setAnalysisLoadingState((prev) => ({ ...prev, [type]: true }));
-    const analysisType = type === "trends" ? "trend" : "citation";
-    setAnalysisType(analysisType);
-    setAnalysisQuery(query);
-    clearMessages();
+
+    // Only set analysis type if the other analysis isn't already running
+    const otherType = type === "trends" ? "citations" : "trends";
+    const otherIsRunning = analysisLoadingState[otherType];
+
+    if (!otherIsRunning) {
+      const analysisType = type === "trends" ? "trend" : "citation";
+      setAnalysisType(analysisType);
+      setAnalysisQuery(query);
+      clearMessages();
+    }
 
     try {
       let endpoint = type === "trends" ? "trends" : "citations";
@@ -230,9 +271,6 @@ export default function SearchPage() {
           // eslint-disable-next-line no-console
           console.error("Failed to save trend analysis to Supabase:", error);
         }
-
-        showSuccessMessage("Trend analysis completed successfully!");
-        router.push("/research/analysis");
       } else {
         setCitationPapers(papers);
 
@@ -240,13 +278,10 @@ export default function SearchPage() {
           setPaperId(papers[0].id);
           setPaperTitle(papers[0].title);
         }
-
-        showSuccessMessage(
-          "Citation analysis completed successfully! Redirecting to citation network...",
-        );
-
-        router.push("/citation");
       }
+
+      // Mark this analysis as completed; navigation is handled by the useEffect
+      setCompletedAnalyses((prev) => ({ ...prev, [type]: true }));
     } catch (err: any) {
       showErrorMessage(
         `${type.charAt(0).toUpperCase() + type.slice(1)} analysis failed: ${err.message}`,
@@ -272,7 +307,7 @@ export default function SearchPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-blue-900/50">
+      <div className="brand-app-shell">
         <Navbar />
 
         <Message

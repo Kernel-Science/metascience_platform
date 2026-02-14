@@ -45,14 +45,14 @@ const AIInsights: React.FC<AIInsightsProps> = ({ data }) => {
 
   if (!sanitizedData) {
     return (
-      <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
+      <div className="rounded-2xl border border-[var(--fqxi-border)] bg-[var(--fqxi-paper-soft)] p-6">
         <div className="flex items-center mb-4">
-          <Brain className="w-5 h-5 text-gray-400 mr-2" />
-          <h3 className="text-lg font-semibold text-gray-500 dark:text-gray-300">
+          <Brain className="mr-2 h-5 w-5 text-[var(--fqxi-ink-muted)]" />
+          <h3 className="text-lg font-semibold text-[var(--fqxi-ink-muted)]">
             AI Analysis
           </h3>
         </div>
-        <p className="text-gray-500 dark:text-gray-300">
+        <p className="text-[var(--fqxi-ink-muted)]">
           No AI insights available. Run analysis to generate insights.
         </p>
       </div>
@@ -60,20 +60,20 @@ const AIInsights: React.FC<AIInsightsProps> = ({ data }) => {
   }
 
   return (
-    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg p-6">
+    <div className="rounded-2xl border border-[var(--fqxi-border)] bg-[var(--fqxi-paper-soft)] p-6">
       <div className="flex items-center mb-4">
-        <Brain className="w-5 h-5 text-blue-600 dark:text-blue-300 mr-2" />
-        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">
+        <Brain className="mr-2 h-5 w-5 text-[var(--fqxi-ink)]" />
+        <h3 className="text-lg font-semibold text-[var(--fqxi-ink)]">
           AI-Powered Insights
         </h3>
       </div>
 
       {sanitizedData.research_evolution && (
-        <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
-          <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-2">
+        <div className="mb-6 rounded-lg border border-[var(--fqxi-border)] bg-[var(--fqxi-paper)] p-4">
+          <h4 className="mb-2 font-medium text-[var(--fqxi-ink)]">
             Research Evolution
           </h4>
-          <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
+          <p className="text-sm leading-relaxed text-[var(--fqxi-ink-muted)]">
             {sanitizedData.research_evolution}
           </p>
         </div>
@@ -83,8 +83,8 @@ const AIInsights: React.FC<AIInsightsProps> = ({ data }) => {
         {sanitizedData.emerging_trends.length > 0 && (
           <div>
             <div className="flex items-center mb-2">
-              <TrendingUp className="w-4 h-4 text-green-600 dark:text-green-300 mr-2" />
-              <h4 className="font-medium text-gray-800 dark:text-gray-100">
+              <TrendingUp className="mr-2 h-4 w-4 text-[var(--fqxi-ink)]" />
+              <h4 className="font-medium text-[var(--fqxi-ink)]">
                 Emerging Trends
               </h4>
             </div>
@@ -92,9 +92,9 @@ const AIInsights: React.FC<AIInsightsProps> = ({ data }) => {
               {sanitizedData.emerging_trends.map((trend, index) => (
                 <li
                   key={index}
-                  className="text-sm text-gray-600 dark:text-gray-300 flex items-start"
+                  className="flex items-start text-sm text-[var(--fqxi-ink-muted)]"
                 >
-                  <span className="w-2 h-2 bg-green-400 rounded-full mt-2 mr-2 flex-shrink-0" />
+                  <span className="mt-2 mr-2 h-2 w-2 flex-shrink-0 rounded-full bg-[var(--fqxi-yellow)]" />
                   {trend}
                 </li>
               ))}
@@ -105,8 +105,8 @@ const AIInsights: React.FC<AIInsightsProps> = ({ data }) => {
         {sanitizedData.key_research_themes.length > 0 && (
           <div>
             <div className="flex items-center mb-2">
-              <Calendar className="w-4 h-4 text-purple-600 dark:text-purple-300 mr-2" />
-              <h4 className="font-medium text-gray-800 dark:text-gray-100">
+              <Calendar className="mr-2 h-4 w-4 text-[var(--fqxi-ink)]" />
+              <h4 className="font-medium text-[var(--fqxi-ink)]">
                 Key Research Themes
               </h4>
             </div>
@@ -114,9 +114,9 @@ const AIInsights: React.FC<AIInsightsProps> = ({ data }) => {
               {sanitizedData.key_research_themes.map((theme, index) => (
                 <li
                   key={index}
-                  className="text-sm text-gray-600 dark:text-gray-300 flex items-start"
+                  className="flex items-start text-sm text-[var(--fqxi-ink-muted)]"
                 >
-                  <span className="w-2 h-2 bg-purple-400 rounded-full mt-2 mr-2 flex-shrink-0" />
+                  <span className="mt-2 mr-2 h-2 w-2 flex-shrink-0 rounded-full bg-[var(--fqxi-yellow)]" />
                   {theme}
                 </li>
               ))}
@@ -127,8 +127,8 @@ const AIInsights: React.FC<AIInsightsProps> = ({ data }) => {
         {sanitizedData.notable_findings.length > 0 && (
           <div>
             <div className="flex items-center mb-2">
-              <Users className="w-4 h-4 text-orange-600 dark:text-orange-300 mr-2" />
-              <h4 className="font-medium text-gray-800 dark:text-gray-100">
+              <Users className="mr-2 h-4 w-4 text-[var(--fqxi-ink)]" />
+              <h4 className="font-medium text-[var(--fqxi-ink)]">
                 Notable Findings
               </h4>
             </div>
@@ -136,9 +136,9 @@ const AIInsights: React.FC<AIInsightsProps> = ({ data }) => {
               {sanitizedData.notable_findings.map((finding, index) => (
                 <li
                   key={index}
-                  className="text-sm text-gray-600 dark:text-gray-300 flex items-start"
+                  className="flex items-start text-sm text-[var(--fqxi-ink-muted)]"
                 >
-                  <span className="w-2 h-2 bg-orange-400 rounded-full mt-2 mr-2 flex-shrink-0" />
+                  <span className="mt-2 mr-2 h-2 w-2 flex-shrink-0 rounded-full bg-[var(--fqxi-yellow)]" />
                   {finding}
                 </li>
               ))}
@@ -147,11 +147,11 @@ const AIInsights: React.FC<AIInsightsProps> = ({ data }) => {
         )}
 
         {sanitizedData.high_impact_areas && (
-          <div className="mb-6 p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
-            <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-2">
+          <div className="mb-6 rounded-lg border border-[var(--fqxi-border)] bg-[var(--fqxi-paper)] p-4">
+            <h4 className="mb-2 font-medium text-[var(--fqxi-ink)]">
               High Impact Areas
             </h4>
-            <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
+            <p className="text-sm leading-relaxed text-[var(--fqxi-ink-muted)]">
               {sanitizedData.high_impact_areas}
             </p>
           </div>
@@ -160,8 +160,8 @@ const AIInsights: React.FC<AIInsightsProps> = ({ data }) => {
         {sanitizedData.future_directions.length > 0 && (
           <div>
             <div className="flex items-center mb-2">
-              <Brain className="w-4 h-4 text-blue-600 dark:text-blue-300 mr-2" />
-              <h4 className="font-medium text-gray-800 dark:text-gray-100">
+              <Brain className="mr-2 h-4 w-4 text-[var(--fqxi-ink)]" />
+              <h4 className="font-medium text-[var(--fqxi-ink)]">
                 Future Directions
               </h4>
             </div>
@@ -169,9 +169,9 @@ const AIInsights: React.FC<AIInsightsProps> = ({ data }) => {
               {sanitizedData.future_directions.map((direction, index) => (
                 <li
                   key={index}
-                  className="text-sm text-gray-600 dark:text-gray-300 flex items-start"
+                  className="flex items-start text-sm text-[var(--fqxi-ink-muted)]"
                 >
-                  <span className="w-2 h-2 bg-blue-400 rounded-full mt-2 mr-2 flex-shrink-0" />
+                  <span className="mt-2 mr-2 h-2 w-2 flex-shrink-0 rounded-full bg-[var(--fqxi-yellow)]" />
                   {direction}
                 </li>
               ))}
