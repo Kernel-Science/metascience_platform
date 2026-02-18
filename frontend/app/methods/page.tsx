@@ -22,6 +22,8 @@ import {
   Building2,
   FlaskConical,
   LayoutGrid,
+  ExternalLink,
+  BarChart2,
 } from "lucide-react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
@@ -232,7 +234,7 @@ export default function MethodsPage() {
                   <div className="flex items-center gap-3">
                     <TrendingUp className="h-5 w-5 text-primary" />
                     <h3 className="text-lg font-semibold text-foreground">
-                      Trend Discovery & Analytics
+                      Trend Discovery &amp; Analytics
                     </h3>
                   </div>
                 </CardHeader>
@@ -260,10 +262,28 @@ export default function MethodsPage() {
                     >
                       How it works
                     </Chip>
-                    <p className="text-sm text-foreground/70">
+                    <p className="text-sm text-foreground/70 mb-2">
                       Combines statistical analysis with Claude 4.5 Sonnet to
                       provide contextual insights into how fields are evolving
                     </p>
+                    <div className="space-y-1 text-xs text-foreground/60">
+                      <div className="flex items-start gap-1.5">
+                        <BarChart2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+                        <span><strong>Publication frequency analysis</strong> — counts papers per year to detect growth or decline in a topic</span>
+                      </div>
+                      <div className="flex items-start gap-1.5">
+                        <BarChart2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+                        <span><strong>Year-over-year growth rates</strong> — computes percentage change in publication volume between consecutive years</span>
+                      </div>
+                      <div className="flex items-start gap-1.5">
+                        <BarChart2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+                        <span><strong>Keyword &amp; concept co-occurrence</strong> — identifies which topics frequently appear together across papers</span>
+                      </div>
+                      <div className="flex items-start gap-1.5">
+                        <BarChart2 className="w-3.5 h-3.5 mt-0.5 shrink-0 text-primary" />
+                        <span><strong>AI synthesis</strong> — Claude 4.5 Sonnet interprets the statistical patterns and generates natural-language insights about field evolution</span>
+                      </div>
+                    </div>
                   </div>
                 </CardBody>
               </Card>
@@ -466,6 +486,75 @@ export default function MethodsPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Overall Score Formula */}
+                <Divider className="my-6" />
+                <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                  <BarChart2 className="h-5 w-5 text-primary" />
+                  Overall Score Calculation
+                </h3>
+                <p className="text-sm text-foreground/70 mb-4">
+                  The overall score is a <strong>weighted average</strong> of all criteria, normalized to 100%. Each criterion is first normalized to a 0–1 range (score ÷ max scale), then multiplied by its weight:
+                </p>
+                <div className="font-mono text-sm bg-default-100/60 rounded-lg px-4 py-3 mb-4 text-foreground/80">
+                  Overall = 100 × Σ(weight × score / max_scale)
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-divider">
+                        <th className="text-left py-2 pr-4 font-semibold text-foreground">Criterion</th>
+                        <th className="text-center py-2 pr-4 font-semibold text-foreground">Scale</th>
+                        <th className="text-center py-2 font-semibold text-foreground">Weight</th>
+                      </tr>
+                    </thead>
+                    <tbody className="text-foreground/70">
+                      <tr className="border-b border-divider/40">
+                        <td className="py-2 pr-4">Formal Correctness</td>
+                        <td className="text-center py-2 pr-4">1–4</td>
+                        <td className="text-center py-2 font-medium text-foreground">25%</td>
+                      </tr>
+                      <tr className="border-b border-divider/40">
+                        <td className="py-2 pr-4">Reproducibility</td>
+                        <td className="text-center py-2 pr-4">1–4</td>
+                        <td className="text-center py-2 font-medium text-foreground">20%</td>
+                      </tr>
+                      <tr className="border-b border-divider/40">
+                        <td className="py-2 pr-4">Impact/Advance</td>
+                        <td className="text-center py-2 pr-4">1–3</td>
+                        <td className="text-center py-2 font-medium text-foreground">15%</td>
+                      </tr>
+                      <tr className="border-b border-divider/40">
+                        <td className="py-2 pr-4">Novelty</td>
+                        <td className="text-center py-2 pr-4">1–5</td>
+                        <td className="text-center py-2 font-medium text-foreground">15%</td>
+                      </tr>
+                      <tr className="border-b border-divider/40">
+                        <td className="py-2 pr-4">Writing Clarity</td>
+                        <td className="text-center py-2 pr-4">1–4</td>
+                        <td className="text-center py-2 font-medium text-foreground">10%</td>
+                      </tr>
+                      <tr className="border-b border-divider/40">
+                        <td className="py-2 pr-4">Writing Grammar</td>
+                        <td className="text-center py-2 pr-4">1–3</td>
+                        <td className="text-center py-2 font-medium text-foreground">5%</td>
+                      </tr>
+                      <tr className="border-b border-divider/40">
+                        <td className="py-2 pr-4">Writing Fairness</td>
+                        <td className="text-center py-2 pr-4">1–3</td>
+                        <td className="text-center py-2 font-medium text-foreground">2.5%</td>
+                      </tr>
+                      <tr>
+                        <td className="py-2 pr-4">Interdisciplinarity</td>
+                        <td className="text-center py-2 pr-4">1–4</td>
+                        <td className="text-center py-2 font-medium text-foreground">2.5%</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-xs text-foreground/50 mt-3">
+                  Weights are defined in the AI reviewer&apos;s system prompt and reflect the relative importance of each dimension in traditional peer review.
+                </p>
               </CardBody>
             </Card>
           </div>
@@ -649,8 +738,14 @@ export default function MethodsPage() {
                     <strong className="block text-foreground mb-1">
                       Error Handling:
                     </strong>
-                    The system validates file uploads and handles processing
-                    errors gracefully
+                    The system validates all inputs before processing and returns descriptive error messages:
+                    <ul className="mt-2 space-y-1 text-xs text-foreground/60 list-none">
+                      <li>• <strong>Unsupported file type</strong> — rejected immediately with a list of accepted formats (PDF, LaTeX, TXT, DOCX, MD)</li>
+                      <li>• <strong>File too large</strong> — rejected if over 100 MB with the actual file size shown</li>
+                      <li>• <strong>URL download failure</strong> — shown to the user immediately with the HTTP status code</li>
+                      <li>• <strong>AI API timeout or failure</strong> — returns HTTP 503 with a descriptive message; the uploaded file is never stored permanently</li>
+                      <li>• <strong>Malformed AI response</strong> — the system attempts JSON repair before returning an error flag with the raw response for debugging</li>
+                    </ul>
                   </div>
                   <div className="text-sm text-foreground/80">
                     <strong className="block text-foreground mb-1">
@@ -679,20 +774,35 @@ export default function MethodsPage() {
                       Code Transparency:
                     </strong>
                     All algorithms and processes are visible in this open-source
-                    codebase
+                    codebase. You can inspect, fork, and contribute on GitHub:
+                    <a
+                      href="https://github.com/Kernel-Science/metascience_platform"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 ml-1 text-primary hover:underline"
+                    >
+                      kernel-science/metascience_platform
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
                   <div className="text-sm text-foreground/80">
                     <strong className="block text-foreground mb-1">
                       Configuration Access:
                     </strong>
                     The exact prompts and instructions given to AI systems are
-                    publicly available
+                    publicly available in the repository under{" "}
+                    <code className="text-xs bg-default-100 px-1 py-0.5 rounded">backend/app/services/config/</code>
                   </div>
                   <div className="text-sm text-foreground/80">
                     <strong className="block text-foreground mb-1">
                       No Hidden Processes:
                     </strong>
-                    Every step of analysis is logged and can be audited
+                    Every analysis step is logged server-side. To audit the system, you can:
+                    <ul className="mt-1 space-y-0.5 text-xs text-foreground/60 list-none">
+                      <li>• Review the open-source code and AI prompts in the GitHub repository</li>
+                      <li>• Inspect the AI prompts shown on this page under &quot;Review System Evaluation Criteria&quot;</li>
+                      <li>• Self-host the platform and inspect server logs directly</li>
+                    </ul>
                   </div>
                 </div>
               </CardBody>
@@ -870,7 +980,7 @@ export default function MethodsPage() {
                 <h3 className="mb-3 text-lg font-semibold text-foreground">
                   Review Scores
                 </h3>
-                <div className="space-y-2 mb-6">
+                <div className="space-y-2 mb-4">
                   <div>
                     • <strong>Scores are relative:</strong> A score of 3/4 means
                     &quot;good&quot; in the context of academic standards, not
@@ -887,10 +997,71 @@ export default function MethodsPage() {
                   </div>
                 </div>
 
+                <div className="grid gap-3 md:grid-cols-2 mb-6">
+                  <div className="p-3 rounded-lg bg-default-100/50 text-xs text-foreground/70 space-y-1">
+                    <div className="font-semibold text-foreground text-sm">Formal Correctness (1–4)</div>
+                    <div>1 = Unsound/fallacious reasoning</div>
+                    <div>2 = Flawed or weak arguments</div>
+                    <div>3 = Coherent and valid</div>
+                    <div>4 = Fully sound and correct</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-default-100/50 text-xs text-foreground/70 space-y-1">
+                    <div className="font-semibold text-foreground text-sm">Reproducibility (1–4)</div>
+                    <div>1 = Not reproducible</div>
+                    <div>2 = Flawed/weak documentation</div>
+                    <div>3 = Partially reproducible</div>
+                    <div>4 = Entirely reproducible</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-default-100/50 text-xs text-foreground/70 space-y-1">
+                    <div className="font-semibold text-foreground text-sm">Impact/Advance (1–3)</div>
+                    <div>1 = Small incremental advance</div>
+                    <div>2 = Significant leap (new approach)</div>
+                    <div>3 = Disruptive discovery</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-default-100/50 text-xs text-foreground/70 space-y-1">
+                    <div className="font-semibold text-foreground text-sm">Novelty (1–5)</div>
+                    <div>1 = Non-novel (redundant)</div>
+                    <div>2 = Mostly non-novel</div>
+                    <div>3 = Partially novel</div>
+                    <div>4 = Mostly novel</div>
+                    <div>5 = Fully original</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-default-100/50 text-xs text-foreground/70 space-y-1">
+                    <div className="font-semibold text-foreground text-sm">Writing Clarity (1–4)</div>
+                    <div>1 = Purpose unclear</div>
+                    <div>2 = Vague or wordy</div>
+                    <div>3 = Well-arranged but slow to read</div>
+                    <div>4 = Clear, specific, fast to read</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-default-100/50 text-xs text-foreground/70 space-y-1">
+                    <div className="font-semibold text-foreground text-sm">Writing Fairness (1–3)</div>
+                    <div>1 = Claims are oversized (hype)</div>
+                    <div>2 = Claims are undersized</div>
+                    <div>3 = Claims are appropriate</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-default-100/50 text-xs text-foreground/70 space-y-1">
+                    <div className="font-semibold text-foreground text-sm">Interdisciplinarity (1–4)</div>
+                    <div>1 = Monodisciplinary (narrow focus)</div>
+                    <div>2 = Multidisciplinary (parallel fields)</div>
+                    <div>3 = Interdisciplinary (integrated)</div>
+                    <div>4 = Transdisciplinary (new frameworks)</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-default-100/50 text-xs text-foreground/70 space-y-1">
+                    <div className="font-semibold text-foreground text-sm">AI Confidence (1–10)</div>
+                    <div>1–2 = Very low (limited domain knowledge)</div>
+                    <div>3–4 = Moderate (some gaps)</div>
+                    <div>5–6 = Good (minor uncertainties)</div>
+                    <div>7–8 = High (strong understanding)</div>
+                    <div>9–10 = Expert-level assessment</div>
+                  </div>
+                </div>
+
+                <Divider className="my-4" />
+
                 <h3 className="mb-3 text-lg font-semibold text-foreground">
                   Citation Analysis
                 </h3>
-                <div className="space-y-2">
+                <div className="space-y-2 mb-4">
                   <div>
                     • <strong>Citation count isn&apos;t everything:</strong>{" "}
                     High citations don&apos;t always mean high quality, and low
@@ -903,6 +1074,12 @@ export default function MethodsPage() {
                   <div>
                     • <strong>Field differences:</strong> Some fields cite more
                     heavily than others
+                  </div>
+                  <div>
+                    • <strong>Data source:</strong> Citation counts shown in Citation Network Analysis are fetched in real time from Semantic Scholar. Counts may differ from Inspire HEP or ADS, which are field-specific databases with different coverage.
+                  </div>
+                  <div>
+                    • <strong>Network visualization:</strong> Node size reflects a composite score (citation count + reference count + recency). Edge thickness represents citation relationships between papers.
                   </div>
                 </div>
               </CardBody>

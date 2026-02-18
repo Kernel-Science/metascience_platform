@@ -8,6 +8,7 @@ import { Progress } from "@heroui/progress";
 import { Input } from "@heroui/input";
 import { Tabs, Tab } from "@heroui/tabs";
 import { Divider } from "@heroui/divider";
+import { Tooltip } from "@heroui/tooltip";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -20,6 +21,8 @@ import {
   Download,
   Trash2,
   Link2,
+  HelpCircle,
+  Users,
 } from "lucide-react";
 import jsPDF from "jspdf";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
@@ -50,6 +53,16 @@ interface ReviewData {
   review_text: string;
   review_date?: string;
   confidence?: number; // AI self-assessed confidence in the review
+  score_justifications?: {
+    formal_correctness?: string;
+    reproducibility?: string;
+    impact?: string;
+    novelty?: string;
+    writing_clarity?: string;
+    writing_grammar?: string;
+    writing_fairness?: string;
+    interdisciplinarity?: string;
+  };
 }
 
 interface DjangoModelResponse {
@@ -275,10 +288,9 @@ export default function ReviewPage() {
           clearMessages();
         } catch (downloadError) {
           showErrorMessage(
-            `Failed to download PDF: ${
-              downloadError instanceof Error
-                ? downloadError.message
-                : "Unknown error"
+            `Failed to download PDF: ${downloadError instanceof Error
+              ? downloadError.message
+              : "Unknown error"
             }`,
           );
           setLoading(false);
@@ -462,11 +474,33 @@ export default function ReviewPage() {
     label: string,
     score: number,
     maxScore: number = 5,
+    justification?: string,
   ) => (
     <Card className="h-full">
       <CardBody className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <h4 className="font-medium text-foreground">{label}</h4>
+          <div className="flex items-center gap-1.5">
+            <h4 className="font-medium text-foreground">{label}</h4>
+            {justification && (
+              <Tooltip
+                content={
+                  <div className="max-w-xs p-1 text-xs leading-relaxed">
+                    {justification}
+                  </div>
+                }
+                placement="top"
+                showArrow
+              >
+                <button
+                  type="button"
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                  aria-label={`${label} justification`}
+                >
+                  <HelpCircle className="w-3.5 h-3.5" />
+                </button>
+              </Tooltip>
+            )}
+          </div>
           <Chip
             color={getScoreColor(score || 0, maxScore)}
             startContent={getScoreIcon(score || 0, maxScore)}
@@ -794,15 +828,17 @@ export default function ReviewPage() {
           },
         ];
 
-        const totalScore = scoreCategories.reduce(
-          (sum, cat) => sum + (cat.score || 0),
-          0,
-        );
-        const maxTotalScore = scoreCategories.reduce(
-          (sum, cat) => sum + cat.max,
-          0,
-        );
-        const overallPercentage = (totalScore / maxTotalScore) * 100;
+        // Use weighted formula matching prompt.txt (weights sum to 0.95 for these 8 fields)
+        const weightedPdfScore =
+          (reviewData.formal_correctness || 0) / 4 * 0.25 +
+          (reviewData.reproducibility || 0) / 4 * 0.20 +
+          (reviewData.impact || 0) / 3 * 0.15 +
+          (reviewData.novelty || 0) / 5 * 0.15 +
+          (reviewData.writing_clarity || 0) / 4 * 0.10 +
+          (reviewData.writing_grammar || 0) / 3 * 0.05 +
+          (reviewData.writing_fairness || 0) / 3 * 0.025 +
+          (reviewData.interdisciplinarity || 0) / 4 * 0.025;
+        const overallPercentage = (weightedPdfScore / 0.95) * 100;
         const overallColor = getScoreColorRGB(overallPercentage, 100);
 
         // Overall score box - prominent
@@ -1355,33 +1391,81 @@ export default function ReviewPage() {
                     <div className="space-y-8">
                       {/* Quick Overall Score */}
                       {(() => {
-                        const scores = [
-                          { v: reviewData.formal_correctness, m: 4 },
-                          { v: reviewData.reproducibility, m: 4 },
-                          { v: reviewData.impact, m: 3 },
-                          { v: reviewData.novelty, m: 5 },
-                          { v: reviewData.writing_clarity, m: 4 },
-                          { v: reviewData.writing_grammar, m: 3 },
-                          { v: reviewData.writing_fairness, m: 3 },
-                          { v: reviewData.interdisciplinarity, m: 4 },
-                        ];
-                        const total = scores.reduce(
-                          (s, x) => s + (x.v || 0),
-                          0,
-                        );
-                        const max = scores.reduce((s, x) => s + x.m, 0);
-                        const pct = max > 0 ? (total / max) * 100 : 0;
+                        // Weighted formula matching prompt.txt:
+                        // formal_correctness: 0.25 (max 4), reproducibility: 0.20 (max 4),
+                        // impact: 0.15 (max 3), novelty: 0.15 (max 5),
+                        // writing_clarity: 0.10 (max 4), writing_grammar: 0.05 (max 3),
+                        // writing_fairness: 0.025 (max 3), interdisciplinarity: 0.025 (max 4)
+                        // Note: writing_consistency (0.05) is not a separate field;
+                        // its weight is redistributed proportionally.
+                        const weightedScore =
+                          (reviewData.formal_correctness || 0) / 4 * 0.25 +
+                          (reviewData.reproducibility || 0) / 4 * 0.20 +
+                          (reviewData.impact || 0) / 3 * 0.15 +
+                          (reviewData.novelty || 0) / 5 * 0.15 +
+                          (reviewData.writing_clarity || 0) / 4 * 0.10 +
+                          (reviewData.writing_grammar || 0) / 3 * 0.05 +
+                          (reviewData.writing_fairness || 0) / 3 * 0.025 +
+                          (reviewData.interdisciplinarity || 0) / 4 * 0.025;
+                        // Scale to 100 (weights sum to 0.95, so normalize)
+                        const pct = (weightedScore / 0.95) * 100;
                         return (
-                          <Card className="bg-content2">
-                            <CardBody className="py-5 px-6">
-                              <div className="flex items-center justify-between gap-4 flex-wrap">
-                                <div className="flex items-center gap-3">
-                                  <Star className="w-5 h-5 text-primary" />
-                                  <h4 className="font-semibold text-foreground">
-                                    Overall Score
-                                  </h4>
+                          <>
+                            <Card className="bg-content2">
+                              <CardBody className="py-5 px-6">
+                                <div className="flex items-center justify-between gap-4 flex-wrap">
+                                  <div className="flex items-center gap-2">
+                                    <Star className="w-5 h-5 text-primary" />
+                                    <h4 className="font-semibold text-foreground">
+                                      Overall Score
+                                    </h4>
+                                    <Tooltip
+                                      content={
+                                        <div className="max-w-xs p-1 text-xs leading-relaxed">
+                                          <p className="font-semibold mb-1">Weighted formula:</p>
+                                          <p className="mb-1">Overall = 100 × Σ(weight × score / max_scale)</p>
+                                          <ul className="space-y-0.5 text-foreground/60 list-none">
+                                            <li>Formal Correctness: 25% (scale 1–4)</li>
+                                            <li>Reproducibility: 20% (scale 1–4)</li>
+                                            <li>Impact: 15% (scale 1–3)</li>
+                                            <li>Novelty: 15% (scale 1–5)</li>
+                                            <li>Writing Clarity: 10% (scale 1–4)</li>
+                                            <li>Writing Grammar: 5% (scale 1–3)</li>
+                                            <li>Writing Fairness: 2.5% (scale 1–3)</li>
+                                            <li>Interdisciplinarity: 2.5% (scale 1–4)</li>
+                                          </ul>
+                                        </div>
+                                      }
+                                      placement="top"
+                                      showArrow
+                                    >
+                                      <button
+                                        type="button"
+                                        className="text-muted-foreground hover:text-primary transition-colors"
+                                        aria-label="How is the overall score calculated?"
+                                      >
+                                        <HelpCircle className="w-4 h-4" />
+                                      </button>
+                                    </Tooltip>
+                                  </div>
+                                  <Chip
+                                    color={
+                                      pct >= 80
+                                        ? "success"
+                                        : pct >= 60
+                                          ? "warning"
+                                          : pct >= 40
+                                            ? "secondary"
+                                            : "danger"
+                                    }
+                                    variant="flat"
+                                  >
+                                    {pct.toFixed(1)}%
+                                  </Chip>
                                 </div>
-                                <Chip
+                                <Progress
+                                  className="mt-3"
+                                  value={pct}
                                   color={
                                     pct >= 80
                                       ? "success"
@@ -1391,26 +1475,17 @@ export default function ReviewPage() {
                                           ? "secondary"
                                           : "danger"
                                   }
-                                  variant="flat"
-                                >
-                                  {pct.toFixed(1)}%
-                                </Chip>
-                              </div>
-                              <Progress
-                                className="mt-3"
-                                value={pct}
-                                color={
-                                  pct >= 80
-                                    ? "success"
-                                    : pct >= 60
-                                      ? "warning"
-                                      : pct >= 40
-                                        ? "secondary"
-                                        : "danger"
-                                }
-                              />
-                            </CardBody>
-                          </Card>
+                                />
+                              </CardBody>
+                            </Card>
+                            {/* Human review comparison note */}
+                            <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-default-100/60 border border-divider/40">
+                              <Users className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                              <p className="text-xs text-foreground/60">
+                                <span className="font-medium text-foreground/80">Human review comparison</span> — Side-by-side comparison with human expert scores is a planned feature. Currently, only AI-generated scores are available.
+                              </p>
+                            </div>
+                          </>
                         );
                       })()}
 
@@ -1421,33 +1496,43 @@ export default function ReviewPage() {
                               "Formal Correctness",
                               reviewData.formal_correctness,
                               4,
+                              reviewData.score_justifications?.formal_correctness,
                             )}
                             {renderScoreCard(
                               "Reproducibility",
                               reviewData.reproducibility,
                               4,
+                              reviewData.score_justifications?.reproducibility,
                             )}
-                            {renderScoreCard("Impact", reviewData.impact, 3)}
-                            {renderScoreCard("Novelty", reviewData.novelty, 5)}
+                            {renderScoreCard("Impact", reviewData.impact, 3,
+                              reviewData.score_justifications?.impact,
+                            )}
+                            {renderScoreCard("Novelty", reviewData.novelty, 5,
+                              reviewData.score_justifications?.novelty,
+                            )}
                             {renderScoreCard(
                               "Writing Clarity",
                               reviewData.writing_clarity,
                               4,
+                              reviewData.score_justifications?.writing_clarity,
                             )}
                             {renderScoreCard(
                               "Writing Grammar",
                               reviewData.writing_grammar,
                               3,
+                              reviewData.score_justifications?.writing_grammar,
                             )}
                             {renderScoreCard(
                               "Writing Fairness",
                               reviewData.writing_fairness,
                               3,
+                              reviewData.score_justifications?.writing_fairness,
                             )}
                             {renderScoreCard(
                               "Interdisciplinarity",
                               reviewData.interdisciplinarity,
                               4,
+                              reviewData.score_justifications?.interdisciplinarity,
                             )}
                           </div>
                         </Tab>

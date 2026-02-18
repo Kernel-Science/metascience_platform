@@ -178,10 +178,6 @@ class AdvancedResearchAPIClient:
 
                 arxiv_id = result.get_short_id()
 
-                # FAST MODE: Don't fetch citations during search, return papers immediately
-                # Citations will be estimated or fetched later in background
-                estimated_citations = self._estimate_citations(result)
-
                 papers.append({
                     'id': arxiv_id,
                     'arxiv_id': arxiv_id,
@@ -200,11 +196,11 @@ class AdvancedResearchAPIClient:
                     'source_name': 'ArXiv',
                     'venue': result.journal_ref if getattr(result, 'journal_ref', None) else 'ArXiv Preprints',
                     'year': result.published.year if result.published else 0,
-                    'citationCount': estimated_citations,  # Use estimation instead of API calls
+                    'citationCount': 0,
                     'isOpenAccess': True,
                     'fieldsOfStudy': result.categories,
                     'publicationTypes': ['Preprint'] if not getattr(result, 'journal_ref', None) else ['Article', 'Preprint'],
-                    'citation_fetched': False,  # Mark as estimated
+                    'citation_fetched': False,
                 })
             return papers
         except Exception as e:
@@ -227,55 +223,6 @@ class AdvancedResearchAPIClient:
                 return re.sub(r'^(doi:|DOI:|https?://doi\.org/)', '', doi, flags=re.IGNORECASE).strip()
         return None
 
-    def _estimate_citations(self, result) -> int:
-        """Fast citation estimation based on paper characteristics"""
-        try:
-            import datetime
-
-            # Base score
-            score = 0
-
-            # Age factor (older papers tend to have more citations)
-            if result.published:
-                age_years = (datetime.datetime.now() - result.published).days / 365.25
-                if age_years > 5:
-                    score += min(int(age_years * 2), 20)
-                elif age_years > 2:
-                    score += int(age_years * 5)
-
-            # Journal publication boost
-            if hasattr(result, 'journal_ref') and result.journal_ref:
-                score += 15
-                # High-impact journal indicators
-                journal_ref = result.journal_ref.lower()
-                if any(term in journal_ref for term in ['nature', 'science', 'cell', 'nejm', 'lancet']):
-                    score += 50
-                elif any(term in journal_ref for term in ['ieee', 'acm', 'pnas', 'jama']):
-                    score += 25
-
-            # Field-based estimation
-            categories = getattr(result, 'categories', [])
-            if categories:
-                cat_str = ' '.join(categories).lower()
-                # ML/AI papers tend to get more citations
-                if any(term in cat_str for term in ['cs.lg', 'cs.ai', 'stat.ml']):
-                    score += 10
-                # Medical/bio papers
-                elif any(term in cat_str for term in ['q-bio', 'physics.med-ph']):
-                    score += 8
-                # Physics papers
-                elif 'physics' in cat_str:
-                    score += 5
-
-            # Title analysis for trendy topics
-            title_lower = result.title.lower()
-            if any(term in title_lower for term in ['deep learning', 'neural network', 'transformer', 'covid', 'cancer']):
-                score += 10
-
-            return max(0, score)
-
-        except Exception:
-            return 0
 
     @safe_execution("search enhanced openalex", default_val=[])
     async def search_openalex_enhanced(self, query: str, per_page: int = 20) -> List[Dict]:
