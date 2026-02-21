@@ -43,6 +43,7 @@ function CitationPageContent() {
     setPaperId,
     setPaperTitle,
     saveCitationToSupabase,
+    clearCitation, // Import clearCitation
   } = useCitationStore();
 
   // On mount, check for sessionStorage and migrate to Zustand if needed
@@ -51,6 +52,9 @@ function CitationPageContent() {
 
     if (storedPapers) {
       try {
+        // Clear any existing network data to prevent mixing old and new
+        clearCitation();
+
         const papersData = JSON.parse(storedPapers);
 
         setImportedPapers(papersData);
@@ -63,16 +67,21 @@ function CitationPageContent() {
 
         if (dois.length > 0) {
           setSeedDois(dois);
+          // Auto-trigger the network generation
+          setSearchQuery(dois.join("\n"));
+          setPaperId(papersData[0].id);
+          setPaperTitle(papersData[0].title);
         }
       } catch {
         // Ignore error
       }
     }
-  }, [setImportedPapers]);
+  }, [setImportedPapers, clearCitation]);
 
   // Watch for papers imported from research page via Zustand store
   useEffect(() => {
-    if (importedPapers.length > 0) {
+    // Only run if we actually have imported papers and no seed DOIs yet (to avoid double-setting on mount)
+    if (importedPapers.length > 0 && seedDois.length === 0) {
       setShowImportedBanner(true);
       // Extract DOIs and set as seed DOIs for the citation search
       const dois = importedPapers
@@ -83,27 +92,33 @@ function CitationPageContent() {
         setSeedDois(dois);
       }
     }
-  }, [importedPapers]);
+  }, [importedPapers, seedDois.length]);
 
   useEffect(() => {
     const doisFromQuery = searchParams.get("dois");
 
     if (doisFromQuery) {
+      // Clear store for deep links too
+      clearCitation();
       const decodedDois = decodeURIComponent(doisFromQuery).split("\n");
       setSeedDois(decodedDois);
+      setSearchQuery(decodedDois.join("\n")); // Auto-trigger for deep links
     }
-  }, [searchParams]);
+  }, [searchParams, clearCitation]);
 
-  // Save citation data when graph or papers are updated
+  // Save citation data when graph is fully loaded
   useEffect(() => {
     if (citationGraph && allNodes.length > 0 && paperId) {
-      (async () => {
+      const timer = setTimeout(async () => {
         try {
+          // The store now handles duplicate prevention via isSaved flag
           await saveCitationToSupabase();
         } catch {
           // Ignore error
         }
-      })();
+      }, 1000); // Debounce 1s to ensure graph is fully stable
+
+      return () => clearTimeout(timer);
     }
   }, [citationGraph, allNodes, paperId, saveCitationToSupabase]);
 
@@ -111,10 +126,19 @@ function CitationPageContent() {
     setSearchQuery(seedDois.join("\n"));
     setSelectedNode(undefined);
 
-    // Set current paper for tracking (use first paper if available)
+    // Set current paper for tracking
     if (importedPapers.length > 0) {
+      // Papers came from search results — use the first paper's details
       setPaperId(importedPapers[0].id);
       setPaperTitle(importedPapers[0].title);
+    } else if (seedDois.length > 0) {
+      // DOIs were manually entered — use DOIs as identifier
+      setPaperId(seedDois[0]);
+      setPaperTitle(
+        seedDois.length === 1
+          ? `Citation network for ${seedDois[0]}`
+          : `Citation network (${seedDois.length} DOIs)`
+      );
     }
   };
 
@@ -203,22 +227,20 @@ function CitationPageContent() {
                   {allNodes.length > 0 && (
                     <div className="flex rounded-lg border border-foreground/18 bg-content1/80 p-1 shadow-sm">
                       <button
-                        className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                          viewMode === "network"
-                            ? "bg-foreground text-background shadow-sm"
-                            : "text-foreground/65 hover:text-foreground"
-                        }`}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${viewMode === "network"
+                          ? "bg-foreground text-background shadow-sm"
+                          : "text-foreground/65 hover:text-foreground"
+                          }`}
                         onClick={() => setViewMode("network")}
                       >
                         <Eye className="w-4 h-4" />
                         <span>Network</span>
                       </button>
                       <button
-                        className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-                          viewMode === "papers"
-                            ? "bg-foreground text-background shadow-sm"
-                            : "text-foreground/65 hover:text-foreground"
-                        }`}
+                        className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${viewMode === "papers"
+                          ? "bg-foreground text-background shadow-sm"
+                          : "text-foreground/65 hover:text-foreground"
+                          }`}
                         onClick={() => setViewMode("papers")}
                       >
                         <List className="w-4 h-4" />
@@ -303,7 +325,8 @@ function CitationPageContent() {
                   <div className="ml-3">
                     <p className="text-sm font-medium text-green-800 dark:text-green-200">
                       Successfully imported {importedPapers.length} papers from
-                      search results.
+                      search results ({seedDois.length} with valid DOIs used as
+                      seeds).
                     </p>
                     <p className="text-sm text-green-700 dark:text-green-300">
                       Click on a node in the network to view paper details.

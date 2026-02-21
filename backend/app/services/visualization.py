@@ -46,14 +46,14 @@ class VisualizationDataGenerator:
                     pair = tuple(sorted([paper_authors[i], paper_authors[j]]))
                     collab_pairs.add(pair)
 
-        links = [{"source": s, "target": t, "weight": 1} for s, t in list(collab_pairs)[:100]]
+        edges = [{"source": s, "target": t, "weight": 1} for s, t in list(collab_pairs)[:100]]
 
         return {
             "nodes": nodes,
-            "links": links,
+            "edges": edges,
             "stats": {
                 "total_authors": len(nodes),
-                "total_collaborations": len(links),
+                "total_collaborations": len(edges),
                 "most_collaborative": max(author_stats, key=lambda x: len(author_stats[x]["collaborators"])) if author_stats else None
             }
         }

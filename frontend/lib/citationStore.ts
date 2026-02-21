@@ -10,7 +10,12 @@ interface CitationState {
   citationPapers: any[];
   setCitationPapers: (papers: any[]) => void;
   citationGraph: any;
-  setCitationGraph: (graph: any) => void;
+  setCitationGraph: (graph: any, isSaved?: boolean) => void;
+  isSaved: boolean; // Track if current graph is saved
+  isGeneratingNetwork: boolean;
+  setIsGeneratingNetwork: (isGenerating: boolean) => void;
+  networkGenerationError: string | null;
+  setNetworkGenerationError: (error: string | null) => void;
   clearCitation: () => void;
   saveCitationToSupabase: () => Promise<void>;
   loadCitationHistory: () => Promise<any[]>;
@@ -18,25 +23,34 @@ interface CitationState {
 
 export const useCitationStore = create<CitationState>((set, get) => ({
   paperId: "",
-  setPaperId: (id) => set({ paperId: id }),
+  setPaperId: (id) => set({ paperId: id, isSaved: false }), // Reset saved status on new paper
   paperTitle: "",
-  setPaperTitle: (title) => set({ paperTitle: title }),
+  setPaperTitle: (title) => set({ paperTitle: title, isSaved: false }),
   citationPapers: [],
   setCitationPapers: (papers) => set({ citationPapers: papers }),
   citationGraph: null,
-  setCitationGraph: (graph) => set({ citationGraph: graph }),
+  setCitationGraph: (graph, isSaved = false) => set({ citationGraph: graph, isSaved }), // Allow setting saved status
+  isSaved: false,
+  isGeneratingNetwork: false,
+  setIsGeneratingNetwork: (isGenerating) =>
+    set({ isGeneratingNetwork: isGenerating }),
+  networkGenerationError: null,
+  setNetworkGenerationError: (error) => set({ networkGenerationError: error }),
   clearCitation: () =>
     set({
       paperId: "",
       paperTitle: "",
       citationPapers: [],
       citationGraph: null,
+      isSaved: false,
+      isGeneratingNetwork: false,
+      networkGenerationError: null,
     }),
 
   saveCitationToSupabase: async () => {
-    const { paperId, paperTitle, citationPapers, citationGraph } = get();
+    const { paperId, paperTitle, citationPapers, citationGraph, isSaved } = get();
 
-    if (!paperId) return;
+    if (!paperId || isSaved) return; // Don't save if already saved
 
     try {
       const supabase = createClient();
@@ -65,6 +79,7 @@ export const useCitationStore = create<CitationState>((set, get) => ({
         return;
       }
 
+      set({ isSaved: true }); // Mark as saved
       // Optionally, show a success notification here if desired
     } catch {
       notifyError(

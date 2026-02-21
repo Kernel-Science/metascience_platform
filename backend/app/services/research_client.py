@@ -4,6 +4,7 @@ import sys
 import hashlib
 import logging
 from datetime import datetime
+from urllib.parse import quote
 
 logger = logging.getLogger(__name__)
 from typing import List, Dict, Any, Union
@@ -167,42 +168,119 @@ class AdvancedResearchAPIClient:
                 sort_by=arxiv.SortCriterion.Relevance,
                 sort_order=arxiv.SortOrder.Descending
             )
-            client = arxiv.Client()
-            papers = []
-            for result in client.results(search):
-                doi = getattr(result, "doi", None)
-                if not doi and getattr(result, "journal_ref", None):
-                    doi = self._extract_doi_from_text(result.journal_ref)
-                if not doi and getattr(result, "comment", None):
-                    doi = self._extract_doi_from_text(result.comment)
+            # Use a smaller page size to avoid timeouts/429s on complex queries
+            # This splits the request into multiple smaller chunks (e.g. 20 at a time)
+            # Define search strategies: Original -> Simplified
+            strategies = [q]
+            # Try to simplify if we have category filters which might be causing 429s/timeouts
+            if "cat:" in q:
+                import re
+                # Strip category filters: (cat:A OR cat:B) or cat:A
+                simple = re.sub(r'\(?cat:[^\s)]+\s*(?:OR\s*cat:[^\s)]+)*\)?', '', q).strip()
+                # Clean up multiple spaces
+                simple = " ".join(simple.split())
+                if simple and simple != q:
+                    strategies.append(simple)
+                    logger.info(f"Added fallback strategy: '{simple}'")
 
-                arxiv_id = result.get_short_id()
+            # Iterate through strategies (Complex -> Simple)
+            for strategy_idx, current_q in enumerate(strategies):
+                if strategy_idx > 0:
+                     logger.warning(f"Fallback: Trying simplified query: '{current_q}'")
 
-                papers.append({
-                    'id': arxiv_id,
-                    'arxiv_id': arxiv_id,
-                    'doi': doi,
-                    'title': result.title,
-                    'authors': [a.name for a in result.authors],
-                    'abstract': result.summary,
-                    'published': result.published.isoformat() if result.published else '',
-                    'updated': result.updated.isoformat() if result.updated else '',
-                    'categories': result.categories,
-                    'pdf_url': result.pdf_url,
-                    'abs_url': result.entry_id,
-                    'journal_ref': getattr(result, 'journal_ref', None),
-                    'comment': getattr(result, 'comment', None),
-                    'source': 'arxiv',
-                    'source_name': 'ArXiv',
-                    'venue': result.journal_ref if getattr(result, 'journal_ref', None) else 'ArXiv Preprints',
-                    'year': result.published.year if result.published else 0,
-                    'citationCount': 0,
-                    'isOpenAccess': True,
-                    'fieldsOfStudy': result.categories,
-                    'publicationTypes': ['Preprint'] if not getattr(result, 'journal_ref', None) else ['Article', 'Preprint'],
-                    'citation_fetched': False,
-                })
-            return papers
+                search = arxiv.Search(
+                    query=current_q,
+                    max_results=max_results,
+                    sort_by=arxiv.SortCriterion.Relevance,
+                    sort_order=arxiv.SortOrder.Descending
+                )
+                
+                # Use a smaller page size to avoid timeouts/429s on complex queries
+                client = arxiv.Client(
+                    page_size=20,  # Reduced page size for stability
+                    delay_seconds=3.0,
+                    num_retries=3
+                )
+                
+                # Manual retry strategy for ArXiv API rate limits (429)
+                papers = []
+                max_retries = 2  # Reduced from 3 to fail faster
+                backoff_base = 2.0  # Reduced from 5.0 to 2.0
+
+                for attempt in range(max_retries):
+                    try:
+                        # Enforce a small delay before every request to be safe
+                        if attempt > 0:
+                            wait_time = backoff_base * (2 ** (attempt - 1))
+                            logger.warning(f"ArXiv retry attempt {attempt + 1}/{max_retries}. Waiting {wait_time}s...")
+                            await asyncio.sleep(wait_time)
+                        else:
+                            # Initial delay to space out requests slightly
+                            await asyncio.sleep(0.5)  # Reduced from 1.0
+
+                        # Consume the generator fully into a list
+                        results_list = list(client.results(search))
+                        
+                        for result in results_list:
+                            doi = getattr(result, "doi", None)
+                            if not doi and getattr(result, "journal_ref", None):
+                                doi = self._extract_doi_from_text(result.journal_ref)
+                            if not doi and getattr(result, "comment", None):
+                                doi = self._extract_doi_from_text(result.comment)
+
+                            arxiv_id = result.get_short_id()
+
+                            papers.append({
+                                'id': arxiv_id,
+                                'arxiv_id': arxiv_id,
+                                'doi': doi,
+                                'title': result.title,
+                                'authors': [a.name for a in result.authors],
+                                'abstract': result.summary,
+                                'published': result.published.isoformat() if result.published else '',
+                                'updated': result.updated.isoformat() if result.updated else '',
+                                'categories': result.categories,
+                                'pdf_url': result.pdf_url,
+                                'abs_url': result.entry_id,
+                                'journal_ref': getattr(result, 'journal_ref', None),
+                                'comment': getattr(result, 'comment', None),
+                                'source': 'arxiv',
+                                'source_name': 'ArXiv',
+                                'venue': result.journal_ref if getattr(result, 'journal_ref', None) else 'ArXiv Preprints',
+                                'year': result.published.year if result.published else 0,
+                                'citationCount': 0,
+                                'isOpenAccess': True,
+                                'fieldsOfStudy': result.categories,
+                                'publicationTypes': ['Preprint'] if not getattr(result, 'journal_ref', None) else ['Article', 'Preprint'],
+                                'citation_fetched': False,
+                            })
+                        
+                        # If we succeed, verify we actually got results (sometimes empty list is success)
+                        # But even if empty, it means the query worked but found nothing. 
+                        # Or maybe we want to fallback if 0 results? 
+                        # For now, if no exception, return papers.
+                        return papers
+
+                    except Exception as e:
+                        # Check for rate limit
+                        is_rate_limit = "429" in str(e) or (hasattr(e, 'status') and e.status == 429)
+                        
+                        if is_rate_limit:
+                            logger.warning(f"ArXiv rate limit (429) hit on attempt {attempt + 1}: {e}")
+                            if attempt < max_retries - 1:
+                                continue  # Retry
+                            else:
+                                logger.error(f"ArXiv rate limit persisted after {max_retries} retries for query '{current_q}'.")
+                                # Break inner loop to try next strategy
+                                break 
+                        else:
+                            logger.error(f"ArXiv error: {e}")
+                            # Break inner loop to try next strategy
+                            break
+
+            # If all strategies failed
+            logger.error("All ArXiv search strategies failed.")
+            return []
         except Exception as e:
             logger.error(f"ArXiv error: {e}")
             return []
@@ -318,20 +396,60 @@ class AdvancedResearchAPIClient:
 
         clean = self._clean_doi(doi)
         result = {}
+        
+        # Check if input looks like an ArXiv ID (e.g. "2301.12345", "arXiv:2301.12345", "10.48550/arXiv.2301.12345")
+        import re
+        arxiv_match = re.search(r'(?:arXiv:)?(\d{4}\.\d{4,5}(?:v\d+)?)', clean, re.IGNORECASE)
+        is_arxiv_doi = "10.48550/arXiv." in clean
+        
         try:
             if source == "semantic_scholar":
-                url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{clean}"
-                params = {"fields": "paperId,title,authors,year,citationCount,referenceCount,abstract,venue,fieldsOfStudy,url"}
-                r = await self.httpx_client.get(url, params=params)
-                if r.status_code == 200:
-                    data = r.json()
-                    if data and data.get("paperId"):
-                        result = self._parse_s2([data])[0]
+                # Strategy 1: Try as DOI first (unless it's clearly just an ArXiv ID)
+                found = False
+                if not (arxiv_match and not is_arxiv_doi and "10." not in clean):
+                    url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(clean)}"
+                    params = {"fields": "paperId,title,authors,year,citationCount,referenceCount,abstract,venue,fieldsOfStudy,url,externalIds"}
+                    try:
+                        r = await self.httpx_client.get(url, params=params)
+                        if r.status_code == 200:
+                            data = r.json()
+                            if data and data.get("paperId"):
+                                result = self._parse_s2([data])[0]
+                                found = True
+                    except Exception:
+                        pass # Try fallback
+                
+                # Strategy 2: If DOI failed or wasn't tried, and looks like ArXiv, try ArXiv ID
+                if not found and arxiv_match:
+                    arxiv_id = arxiv_match.group(1)
+                    url = f"https://api.semanticscholar.org/graph/v1/paper/ARXIV:{arxiv_id}"
+                    params = {"fields": "paperId,title,authors,year,citationCount,referenceCount,abstract,venue,fieldsOfStudy,url,externalIds"}
+                    try:
+                        r = await self.httpx_client.get(url, params=params)
+                        if r.status_code == 200:
+                            data = r.json()
+                            if data and data.get("paperId"):
+                                result = self._parse_s2([data])[0]
+                    except Exception as e:
+                         logger.warning(f"S2 ArXiv lookup failed for {arxiv_id}: {e}")
+
             elif source == "openalex":
-                url = f"https://api.openalex.org/works/doi:{clean}"
+                url = f"https://api.openalex.org/works/doi:{quote(clean)}"
                 r = await self.httpx_client.get(url)
                 if r.status_code == 200:
                     result = self._parse_openalex([r.json()])[0]
+                elif r.status_code == 404 and arxiv_match:
+                     # Fallback to ArXiv ID for OpenAlex
+                    arxiv_id = arxiv_match.group(1)
+                    # OpenAlex uses fully qualified IDs usually, but let's try searching works
+                    url = "https://api.openalex.org/works"
+                    params = {"filter": f"ids.arxiv:{arxiv_id}"}
+                    r = await self.httpx_client.get(url, params=params)
+                    if r.status_code == 200:
+                        results = r.json().get("results", [])
+                        if results:
+                             result = self._parse_openalex([results[0]])[0]
+
         except Exception as e:
             logger.error(f"DOI fetch error: {e}")
 

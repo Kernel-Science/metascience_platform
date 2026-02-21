@@ -215,10 +215,8 @@ class CitationNetworkAnalyzer:
         filtered_edges = []
 
         # Get the actual node IDs from the papers
-        paper_node_ids = set()
-        for paper_key, paper_data in papers.items():
-            node_id = paper_data.get('id', paper_key)
-            paper_node_ids.add(node_id)
+        # We will use the deduplicated keys directly
+        paper_node_ids = set(papers.keys())
 
         logger.debug(f"Filtering edges for {len(paper_node_ids)} papers")
 
@@ -234,7 +232,8 @@ class CitationNetworkAnalyzer:
                                              citations: List[Dict[str, Any]]):
         """
         Build citation relationships between all papers in the network.
-        Optimized with set-based edge deduplication.
+        Uses _source_seed_id tags to create correct edges (seed→reference,
+        citation→seed) instead of linking every ref/cit to every seed.
         """
         edge_set = set()  # Use set for O(1) duplicate detection
         all_paper_ids = set(papers.keys())
@@ -249,37 +248,59 @@ class CitationNetworkAnalyzer:
                     id_map[self.normalize_id(paper_data[id_field])] = primary_id
 
         # 1. Create edges from seed papers to their references
-        for seed_paper_id in self.seed_ids:
-            if seed_paper_id not in papers:
+        #    Each reference carries _source_seed_id telling us which seed cited it
+        for ref in references:
+            ref_id = self.extract_doi(ref)
+            if ref_id not in all_paper_ids:
                 continue
-            from_node_id = papers[seed_paper_id].get('id', seed_paper_id)
 
-            for ref in references:
-                ref_id = self.extract_doi(ref)
-                if ref_id in all_paper_ids:
-                    to_node_id = papers[ref_id].get('id', ref_id)
+            source_seed = ref.get('_source_seed_id', '')
+            if source_seed and source_seed in self.seed_ids and source_seed in papers:
+                # Use the tagged source seed
+                from_node_id = source_seed
+                to_node_id = ref_id
+                if from_node_id != to_node_id:
                     edge_set.add((from_node_id, to_node_id))
+            else:
+                # Fallback: if no tag, try all seeds (legacy behavior)
+                for seed_paper_id in self.seed_ids:
+                    if seed_paper_id in papers:
+                        from_node_id = seed_paper_id
+                        to_node_id = ref_id
+                        if from_node_id != to_node_id:
+                            edge_set.add((from_node_id, to_node_id))
 
-        # 2. Create edges from citing papers to the seed papers
+        # 2. Create edges from citing papers to the correct seed paper
+        #    Each citation carries _source_seed_id telling us which seed it cites
         for cit in citations:
             cit_id = self.extract_doi(cit)
-            if cit_id not in papers:
+            if cit_id not in all_paper_ids:
                 continue
-            from_node_id = papers[cit_id].get('id', cit_id)
 
-            for seed_paper_id in self.seed_ids:
-                if seed_paper_id in papers:
-                    to_node_id = papers[seed_paper_id].get('id', seed_paper_id)
+            source_seed = cit.get('_source_seed_id', '')
+            if source_seed and source_seed in self.seed_ids and source_seed in papers:
+                # Use the tagged source seed
+                from_node_id = cit_id
+                to_node_id = source_seed
+                if from_node_id != to_node_id:
                     edge_set.add((from_node_id, to_node_id))
+            else:
+                # Fallback: if no tag, try all seeds (legacy behavior)
+                for seed_paper_id in self.seed_ids:
+                    if seed_paper_id in papers:
+                        from_node_id = cit_id
+                        to_node_id = seed_paper_id
+                        if from_node_id != to_node_id:
+                            edge_set.add((from_node_id, to_node_id))
 
         # 3. Create edges between all other papers based on their reference lists
         for paper_id, paper_data in papers.items():
             if 'references' in paper_data and paper_data['references']:
-                from_node_id = paper_data.get('id', paper_id)
+                from_node_id = paper_id
                 for ref in paper_data['references']:
                     ref_primary_id = id_map.get(self.extract_doi(ref))
                     if ref_primary_id and ref_primary_id in all_paper_ids:
-                        to_node_id = papers[ref_primary_id].get('id', ref_primary_id)
+                        to_node_id = ref_primary_id
                         # Avoid self-loops
                         if from_node_id != to_node_id:
                             edge_set.add((from_node_id, to_node_id))
@@ -352,6 +373,11 @@ class CitationNetworkAnalyzer:
 
         final_papers = {pid: paper for pid, paper in self.papers.items()
                         if pid in final_paper_ids}
+
+        # Ensure that the paper dictionaries returned contain their deduplicated IDs
+        # so that the frontend's papers list matches the graph's nodes.
+        for pid, p in final_papers.items():
+            p['id'] = pid
 
         # Assign groups and prepare for visualization
         final_nodes = self.create_graph_nodes(final_papers, top_cited, top_citing)

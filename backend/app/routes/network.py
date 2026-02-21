@@ -24,11 +24,16 @@ async def get_citation_network(data_source: str, dois: str, cited: str = 'top', 
                 if paper:
                     seed_papers.append(paper)
                     paper_id = paper.get('paperId') or paper.get('id')
+                    seed_id = analyzer.normalize_id(paper.get('doi') or paper.get('id') or paper.get('paperId', ''))
                     if cited != 'none':
                         ref_data = await api_client.fetch_paper_references(paper_id, source=api_source)
+                        for ref in ref_data.get('references', []):
+                            ref['_source_seed_id'] = seed_id
                         references.extend(ref_data.get('references', []))
                     if citing != 'none':
                         cit_data = await api_client.fetch_paper_citations(paper_id, source=api_source)
+                        for cit in cit_data.get('citations', []):
+                            cit['_source_seed_id'] = seed_id
                         citations.extend(cit_data.get('citations', []))
 
         if not seed_papers:
@@ -66,10 +71,18 @@ async def post_citation_network(request: dict):
         if source == 'openalex' and paper_id and paper_id.startswith('https://openalex.org/'):
             paper_id = paper_id.replace('https://openalex.org/', '')
 
+        analyzer = CitationNetworkAnalyzer()
+        seed_id = analyzer.normalize_id(paper.get('doi') or paper.get('id') or paper.get('paperId', ''))
+
         refs = (await api_client.fetch_paper_references(paper_id, source=source)).get('references', [])
         cits = (await api_client.fetch_paper_citations(paper_id, source=source)).get('citations', [])
 
-        analyzer = CitationNetworkAnalyzer()
+        # Tag each ref/cit with the seed paper it belongs to
+        for ref in refs:
+            ref['_source_seed_id'] = seed_id
+        for cit in cits:
+            cit['_source_seed_id'] = seed_id
+
         network_result = analyzer.analyze_network(seed_papers=[paper], references=refs, citations=cits, cited_option=cited, citing_option=citing)
 
         seed_paper_id = paper.get('paperId') or paper.get('id')
@@ -129,15 +142,20 @@ async def post_citation_network_multiple(request: dict):
         if not seed_papers:
             raise HTTPException(status_code=404, detail=f"No papers found for provided DOIs")
 
+        analyzer = CitationNetworkAnalyzer()
+
         # OPTIMIZATION: Parallel references and citations fetching
         async def fetch_refs_cits(paper):
             pid = paper.get('paperId') or paper.get('id')
             if not pid:
-                return ([], [], pid)
+                return ([], [], pid, '')
 
             src = source
             if src == 'openalex' and isinstance(pid, str) and pid.startswith('https://openalex.org/'):
                 pid = pid.replace('https://openalex.org/', '')
+
+            # Compute the seed ID that matches what the analyzer will use
+            seed_id = analyzer.normalize_id(paper.get('doi') or paper.get('id') or paper.get('paperId', ''))
 
             refs_result = await api_client.fetch_paper_references(pid, source=src)
             cits_result = await api_client.fetch_paper_citations(pid, source=src)
@@ -155,7 +173,13 @@ async def post_citation_network_multiple(request: dict):
                     refs = refs_result.get('references', [])
                     cits = cits_result.get('citations', [])
 
-            return (refs[:max_references], cits[:max_citations], pid)
+            # Tag each ref/cit with the seed paper it belongs to
+            for ref in refs:
+                ref['_source_seed_id'] = seed_id
+            for cit in cits:
+                cit['_source_seed_id'] = seed_id
+
+            return (refs, cits, pid, seed_id)
 
         fetch_tasks = [fetch_refs_cits(paper) for paper in seed_papers]
         fetch_results = await asyncio.gather(*fetch_tasks, return_exceptions=True)
@@ -163,7 +187,7 @@ async def post_citation_network_multiple(request: dict):
         all_refs, all_cits, seed_ids = [], [], []
         for result in fetch_results:
             if not isinstance(result, Exception):
-                refs, cits, pid = result
+                refs, cits, pid, sid = result
                 all_refs.extend(refs)
                 all_cits.extend(cits)
                 if pid:
@@ -181,7 +205,6 @@ async def post_citation_network_multiple(request: dict):
         unique_refs = uniq(all_refs)
         unique_cits = uniq(all_cits)
 
-        analyzer = CitationNetworkAnalyzer()
         network = analyzer.analyze_network(seed_papers=seed_papers, references=unique_refs, citations=unique_cits, cited_option=cited, citing_option=citing)
 
         return {
@@ -199,6 +222,124 @@ async def post_citation_network_multiple(request: dict):
                 }
             },
             'message': f'Combined citation network generated successfully for {len(seed_papers)}/{len(valid_dois)} papers'
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+@router.post("/analyze/citation-network-from-papers")
+async def post_citation_network_from_papers(request: dict):
+    try:
+        papers = request.get('papers')
+        if not papers or not isinstance(papers, list):
+            raise HTTPException(status_code=400, detail="Papers list is required")
+
+        max_references = request.get('max_references', 50)
+        max_citations = request.get('max_citations', 50)
+        data_source = request.get('data_source', 's2')
+        source = SOURCE_MAP.get(data_source, 'semantic_scholar')
+
+        cited = 'none' if max_references == 0 else 'all' if max_references >= 1000 else 'top'
+        citing = 'none' if max_citations == 0 else 'all' if max_citations >= 1000 else 'top'
+
+        analyzer = CitationNetworkAnalyzer()
+        seed_papers = []
+
+        # 1. Prepare valid seed papers
+        for p in papers:
+            # If it looks like a full record, use it. Otherwise try to fetch fresh.
+            if p.get('citationCount') is not None and (p.get('paperId') or p.get('doi')):
+                 seed_papers.append(p)
+            elif p.get('doi'):
+                 full_p = await api_client.get_paper_by_doi(p.get('doi'), source=source)
+                 seed_papers.append(full_p if full_p else p)
+            else:
+                 seed_papers.append(p)
+
+        if not seed_papers:
+            raise HTTPException(status_code=404, detail="No valid papers found for analysis")
+
+        # 2. OPTIMIZATION: Parallel references and citations fetching
+        async def fetch_refs_cits(paper):
+            pid = paper.get('paperId') or paper.get('id')
+            if not pid:
+                return ([], [], pid, '')
+
+            src = source
+            if src == 'openalex' and isinstance(pid, str) and pid.startswith('https://openalex.org/'):
+                pid = pid.replace('https://openalex.org/', '')
+
+            # Compute the seed ID that matches what the analyzer will use
+            seed_id = analyzer.normalize_id(paper.get('doi') or paper.get('id') or paper.get('paperId', ''))
+
+            refs, cits = [], []
+            if max_references > 0:
+                refs_result = await api_client.fetch_paper_references(pid, source=src)
+                refs = refs_result.get('references', [])
+            if max_citations > 0:
+                cits_result = await api_client.fetch_paper_citations(pid, source=src)
+                cits = cits_result.get('citations', [])
+
+            # OpenAlex fallback to S2 if empty
+            if len(refs) == 0 and len(cits) == 0 and src == 'openalex' and paper.get('doi'):
+                sp = await api_client.get_paper_by_doi(paper['doi'], source='semantic_scholar')
+                if sp and sp.get('paperId'):
+                    s2id = sp['paperId']
+                    if max_references > 0:
+                         refs_result = await api_client.fetch_paper_references(s2id, source='semantic_scholar')
+                         refs = refs_result.get('references', [])
+                    if max_citations > 0:
+                         cits_result = await api_client.fetch_paper_citations(s2id, source='semantic_scholar')
+                         cits = cits_result.get('citations', [])
+
+            # Tag each ref/cit with the seed paper it belongs to
+            for ref in refs:
+                ref['_source_seed_id'] = seed_id
+            for cit in cits:
+                cit['_source_seed_id'] = seed_id
+
+            return (refs, cits, pid, seed_id)
+
+        # Limit to 10 seeds MAX to prevent massive timeouts
+        fetch_tasks = [fetch_refs_cits(paper) for paper in seed_papers[:10]]
+        fetch_results = await asyncio.gather(*fetch_tasks, return_exceptions=True)
+
+        all_refs, all_cits, seed_ids = [], [], []
+        for result in fetch_results:
+            if not isinstance(result, Exception):
+                refs, cits, pid, sid = result
+                all_refs.extend(refs)
+                all_cits.extend(cits)
+                if pid:
+                    seed_ids.append(pid)
+
+        # deduplicate
+        def uniq(items):
+            seen, res = set(), []
+            for x in items:
+                xid = x.get('doi') or x.get('id') or x.get('paperId')
+                if xid and xid not in seen:
+                    seen.add(xid); res.append(x)
+            return res
+
+        unique_refs = uniq(all_refs)
+        unique_cits = uniq(all_cits)
+
+        network = analyzer.analyze_network(seed_papers=seed_papers[:10], references=unique_refs, citations=unique_cits, cited_option=cited, citing_option=citing)
+
+        return {
+            'success': True,
+            'data': {
+                'papers': network.get('papers', []), # Exposing the full objects
+                'network': {'nodes': network.get('nodes', []), 'edges': network.get('edges', [])},
+                'seed_paper_ids': seed_ids,
+                'stats': {
+                    'total_papers': len(network.get('nodes', [])),
+                    'total_connections': len(network.get('edges', [])),
+                    'seed_papers_processed': len(seed_papers[:10]),
+                }
+            },
+            'message': f'Citation network generated successfully for {len(seed_papers[:10])} papers'
         }
     except HTTPException:
         raise

@@ -10,6 +10,10 @@ interface AnalysisState {
   setCitationAnalysis: (analysis: any) => void;
   trendAnalysis: any;
   setTrendAnalysis: (analysis: any) => void;
+  isGeneratingTrend: boolean;
+  setIsGeneratingTrend: (isGenerating: boolean) => void;
+  trendGenerationError: string | null;
+  setTrendGenerationError: (error: string | null) => void;
   clearAnalysis: () => void;
   saveAnalysisToSupabase: () => Promise<void>;
   loadAnalysisHistory: () => Promise<any[]>;
@@ -23,13 +27,21 @@ export const useAnalysisStore = create<AnalysisState>((set, get) => ({
   citationAnalysis: null,
   setCitationAnalysis: (analysis) => set({ citationAnalysis: analysis }),
   trendAnalysis: null,
+
   setTrendAnalysis: (analysis) => set({ trendAnalysis: analysis }),
+  isGeneratingTrend: false,
+  setIsGeneratingTrend: (isGenerating) =>
+    set({ isGeneratingTrend: isGenerating }),
+  trendGenerationError: null,
+  setTrendGenerationError: (error) => set({ trendGenerationError: error }),
   clearAnalysis: () =>
     set({
       analysisType: null,
       query: "",
       citationAnalysis: null,
       trendAnalysis: null,
+      isGeneratingTrend: false,
+      trendGenerationError: null,
     }),
 
   saveAnalysisToSupabase: async () => {

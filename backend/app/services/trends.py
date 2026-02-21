@@ -74,9 +74,15 @@ class EnhancedTrendAnalyzer:
 
     async def analyze_comprehensive_trends(self, papers: List[Dict]) -> Dict[str, Any]:
         try:
-            # Enrich papers with real citation counts first
-            logger.info(f"🔍 Enriching {len(papers)} papers with citation data...")
-            papers = await self._enrich_papers_with_citations(papers)
+            # Check if papers are already enriched (e.g. they have citation_fetched flag)
+            already_enriched = all(p.get('citation_fetched', False) for p in papers[:5]) if papers else False
+
+            if not already_enriched:
+                # Enrich papers with real citation counts first
+                logger.info(f"🔍 Enriching {len(papers)} papers with citation data...")
+                papers = await self._enrich_papers_with_citations(papers)
+            else:
+                logger.debug("Papers already enriched, skipping fetch.")
 
             # Build stats
             paper_summaries, authors_list, concepts_list, years, venues, citations = [], [], [], [], [], []

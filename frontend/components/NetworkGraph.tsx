@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Graph from "react-graph-vis";
 
 import "vis-network/styles/vis-network.css";
@@ -41,8 +41,18 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
   const storedPaperId = useCitationStore((state) => state.paperId);
 
   // Use graph from store if available
+  // Use graph from store if available, but sanitize it first
+  // This handles the case where old data might have 'links' instead of 'edges'
+  const sanitizeGraph = (g: any) => {
+    if (!g) return { nodes: [], edges: [] };
+    return {
+      nodes: Array.isArray(g.nodes) ? g.nodes : [],
+      edges: Array.isArray(g.edges) ? g.edges : (Array.isArray(g.links) ? g.links : [])
+    };
+  };
+
   const [graph, setGraph] = useState<{ nodes: any[]; edges: any[] }>(
-    citationGraph || { nodes: [], edges: [] },
+    sanitizeGraph(citationGraph)
   );
   const [error, setError] = useState<string | null>(null);
   const [allNodesData, setAllNodesData] = useState<Article[]>([]);
@@ -63,7 +73,7 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
       try {
         const errorData = await response.json();
 
-        errorMsg = errorData.error || errorMsg;
+        errorMsg = errorData.detail || errorData.error || errorMsg;
       } catch {
         // Ignore JSON parsing errors, use default error message
       }
@@ -88,7 +98,7 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
           citationGraph.nodes.length > 0
         ) {
           // Restore stored graph and papers instead of clearing them
-          setGraph(citationGraph);
+          setGraph(sanitizeGraph(citationGraph));
           setAllNodesData(citationPapers || []);
           setAllNodes(citationPapers || []);
           setLoading(false);
@@ -327,46 +337,52 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
         title: paper.title,
         authors: paper.authors
           ? paper.authors.map((author: any) => {
-              // Handle different author formats from backend
-              if (typeof author === "string") {
-                // Simple string format
-                return {
-                  fullName: author,
-                  name: author,
-                };
-              } else if (author.name) {
-                // Object with name field
-                const nameParts = author.name.trim().split(" ");
+            // Handle different author formats from backend
+            if (typeof author === "string") {
+              // Simple string format
+              return {
+                fullName: author,
+                name: author,
+              };
+            } else if (author.name) {
+              // Object with name field
+              const nameParts = author.name.trim().split(" ");
 
-                return {
-                  firstName: nameParts.length > 1 ? nameParts[0] : "",
-                  lastName:
-                    nameParts.length > 1
-                      ? nameParts.slice(1).join(" ")
-                      : nameParts[0],
-                  fullName: author.name,
-                  name: author.name,
-                };
-              } else if (author.FN || author.LN) {
-                // Legacy format with FN/LN fields
-                return {
-                  firstName: author.FN || "",
-                  lastName: author.LN || "",
-                  fullName: `${author.FN || ""} ${author.LN || ""}`.trim(),
-                  orcid: author.orcid,
-                  affiliation: author.affil,
-                };
-              } else {
-                // Fallback for unknown format
-                return {
-                  fullName: "Unknown Author",
-                  name: "Unknown Author",
-                };
-              }
-            })
+              return {
+                firstName: nameParts.length > 1 ? nameParts[0] : "",
+                lastName:
+                  nameParts.length > 1
+                    ? nameParts.slice(1).join(" ")
+                    : nameParts[0],
+                fullName: author.name,
+                name: author.name,
+              };
+            } else if (author.FN || author.LN) {
+              // Legacy format with FN/LN fields
+              return {
+                firstName: author.FN || "",
+                lastName: author.LN || "",
+                fullName: `${author.FN || ""} ${author.LN || ""}`.trim(),
+                orcid: author.orcid,
+                affiliation: author.affil,
+              };
+            } else {
+              // Fallback for unknown format
+              return {
+                fullName: "Unknown Author",
+                name: "Unknown Author",
+              };
+            }
+          })
           : [],
         year: paper.year,
-        journal: paper.journal || paper.venue,
+        journal: (() => {
+          const raw = paper.journal || paper.venue;
+          if (!raw) return undefined;
+          if (typeof raw === 'string') return raw;
+          if (typeof raw === 'object' && raw.name) return raw.name;
+          return String(raw);
+        })(),
         abstract: paper.abstract,
         citationCount: paper.citationsCount || paper.citationCount || 0,
         referenceCount: paper.referencesCount || paper.referenceCount || 0,
@@ -440,49 +456,43 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
         };
       });
 
-      // Create graph edges with minimal modern styling - use the 'edges' array from the network object
+      // Create graph edges - all edges start gray; hover on a node will colorise its connections
       const visualEdges = graphEdges.map((edge: any, index: number) => {
         const firstSeedId = validSeedPaperIds[0];
         const isCitingEdge = firstSeedId && edge.from === firstSeedId;
         const isCitedEdge = firstSeedId && edge.to === firstSeedId;
 
-        let edgeColor, edgeWidth, edgeDashes;
-
+        // Determine the *hover* color for this edge based on its type
+        let hoverColor: string;
         if (isCitingEdge) {
-          edgeColor = "#8b5cf6"; // Purple for papers cited by seed (references)
-          edgeWidth = 0.8;
-          edgeDashes = false;
+          hoverColor = "#8b5cf6"; // Purple for papers cited by seed (references)
         } else if (isCitedEdge) {
-          edgeColor = "#06b6d4"; // Cyan for papers citing seed (citations)
-          edgeWidth = 0.8;
-          edgeDashes = false;
+          hoverColor = "#06b6d4"; // Cyan for papers citing seed (citations)
         } else {
-          edgeColor = "#e5e7eb"; // Very light gray for indirect connections
-          edgeWidth = 0.3;
-          edgeDashes = [2, 4]; // Subtle dashed line for indirect connections
+          hoverColor = "#6366f1"; // Indigo for indirect connections
         }
 
         return {
           id: `edge_${edge.from}_${edge.to}_${index}_${new Date().getTime()}`,
           from: edge.from,
           to: edge.to,
-          arrows: { to: false, from: false, middle: false }, // Disable all arrows (must be object with allowed keys)
+          arrows: { to: false, from: false, middle: false },
           color: {
-            color: edgeColor,
-            highlight: "#6366f1",
-            hover: "#6366f1",
-            opacity: 0.6, // Reduced opacity for better layering
+            color: "rgba(156, 163, 175, 0.7)",      // RGBA for immediate visibility
+            highlight: hoverColor,
+            hover: hoverColor,
           },
-          width: edgeWidth,
-          dashes: edgeDashes,
+          width: 1.5,
           smooth: {
             enabled: true,
-            type: "cubicBezier", // Less curvy than 'continuous'
-            roundness: 0.2, // Subtle curves only
+            type: "cubicBezier",
+            roundness: 0.2,
           },
           physics: true,
           shadow: false,
-          selectionWidth: 2, // Thicker when selected/hovered
+          selectionWidth: 2,
+          // Stash the hover color so event handlers can read it later
+          _hoverColor: hoverColor,
         };
       });
 
@@ -535,18 +545,24 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
           let seedPaper = null;
 
           if (seedId) {
-            seedPaper = articles.find((p: any) => p.id === seedId) || null;
-          }
-
-          // Fallback: if seedPaper not found but at least one article exists,
-          // choose the first article as a seed to allow saving.
-          if (!seedPaper && articles.length > 0) {
-            seedPaper = articles[0];
+            // Try matching by ID, then by DOI
+            seedPaper =
+              articles.find((p: any) => p.id === seedId) ||
+              articles.find((p: any) => p.doi && p.doi.toLowerCase() === seedId.toLowerCase()) ||
+              null;
           }
 
           if (seedPaper) {
             setPaperId(seedPaper.id);
-            setPaperTitle(seedPaper.title || "");
+            setPaperTitle(seedPaper.title || "Citation network");
+          } else if (articles.length > 0) {
+            // No seed paper found — use a descriptive title rather than a random paper
+            setPaperId(articles[0].id);
+            setPaperTitle(
+              validSeedPaperIds && validSeedPaperIds.length > 1
+                ? `Citation network (${validSeedPaperIds.length} papers)`
+                : articles[0].title || "Citation network"
+            );
           }
         }
       } catch {
@@ -570,17 +586,17 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
         yearRange:
           allPapersData.length > 0
             ? {
-                min: Math.min(
-                  ...allPapersData
-                    .filter((p: any) => p.year)
-                    .map((p: Article) => p.year),
-                ),
-                max: Math.max(
-                  ...allPapersData
-                    .filter((p: any) => p.year)
-                    .map((p: Article) => p.year),
-                ),
-              }
+              min: Math.min(
+                ...allPapersData
+                  .filter((p: any) => p.year)
+                  .map((p: Article) => p.year),
+              ),
+              max: Math.max(
+                ...allPapersData
+                  .filter((p: any) => p.year)
+                  .map((p: Article) => p.year),
+              ),
+            }
             : null,
       };
 
@@ -648,7 +664,8 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
   }, [graph, setCitationGraph]);
 
   // Add a key to force remounting the Graph component when query changes
-  const graphKey = query + "-" + graph.nodes.length + "-" + graph.edges.length;
+  // Add a key to force remounting the Graph component when query changes
+  const graphKey = query + "-" + (graph.nodes?.length || 0) + "-" + (graph.edges?.length || 0);
 
   const options = {
     layout: {
@@ -698,9 +715,8 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
       },
       color: {
         inherit: false,
-        opacity: 0.6,
       },
-      width: 0.5,
+      width: 1.5,
       selectionWidth: 2.5,
       smooth: {
         enabled: true,
@@ -715,16 +731,94 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
     },
     interaction: {
       hover: true,
-      selectConnectedEdges: false, // Don't select all connected edges
+      selectConnectedEdges: false,
       tooltipDelay: 200,
       zoomView: true,
       dragView: true,
       dragNodes: true,
       hideEdgesOnDrag: true,
       hideEdgesOnZoom: false,
-      hoverConnectedEdges: true,
+      hoverConnectedEdges: false,  // We handle this manually for better styling
     },
   };
+
+  // Auto-recenter: check if graph content is out of the visible canvas area
+  const recenterTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+  const fitNetwork = useCallback(() => {
+    if (networkRef.current) {
+      networkRef.current.fit({
+        animation: {
+          duration: 400,
+          easingFunction: "easeInOutQuad",
+        },
+      });
+    }
+  }, []);
+
+  const checkAndRecenter = useCallback(() => {
+    if (!networkRef.current) return;
+
+    // Clear any pending recenter
+    if (recenterTimeoutRef.current) {
+      clearTimeout(recenterTimeoutRef.current);
+    }
+
+    // Delay the check slightly so the network position settles
+    recenterTimeoutRef.current = setTimeout(() => {
+      if (!networkRef.current) return;
+
+      try {
+        const positions = networkRef.current.getPositions();
+        const nodeIds = Object.keys(positions);
+        if (nodeIds.length === 0) return;
+
+        // Get the bounding box of all nodes in canvas coordinates
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        for (const id of nodeIds) {
+          const pos = positions[id];
+          if (pos) {
+            minX = Math.min(minX, pos.x);
+            maxX = Math.max(maxX, pos.x);
+            minY = Math.min(minY, pos.y);
+            maxY = Math.max(maxY, pos.y);
+          }
+        }
+
+        // Convert the bounding box corners to DOM coordinates
+        const topLeft = networkRef.current.canvasToDOM({ x: minX, y: minY });
+        const bottomRight = networkRef.current.canvasToDOM({ x: maxX, y: maxY });
+
+        // Get the canvas element size
+        const canvasSize = networkRef.current.getSize();
+        const w = canvasSize.width || 800;
+        const h = canvasSize.height || 600;
+
+        // Generous margin — if the entire bounding box is outside the canvas, recenter
+        const margin = 100;
+        const isOutOfView =
+          bottomRight.x < -margin ||
+          topLeft.x > w + margin ||
+          bottomRight.y < -margin ||
+          topLeft.y > h + margin;
+
+        if (isOutOfView) {
+          fitNetwork();
+        }
+      } catch {
+        // Ignore errors from network not ready
+      }
+    }, 300);
+  }, [fitNetwork]);
+
+  // Cleanup recenter timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (recenterTimeoutRef.current) {
+        clearTimeout(recenterTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const events = {
     select: (event: any) => {
@@ -738,6 +832,76 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
 
         onNodeSelect(selectedNodeData);
       }
+    },
+    hoverNode: (event: any) => {
+      const nodeId = event.node;
+      if (!networkRef.current) return;
+
+      const connectedEdges = networkRef.current.getConnectedEdges(nodeId);
+      if (!connectedEdges || connectedEdges.length === 0) return;
+
+      // Build update array: highlight connected edges, dim the rest
+      const allEdges = graph.edges;
+      const connectedSet = new Set(connectedEdges);
+      const updates: any[] = [];
+
+      for (const edge of allEdges) {
+        if (connectedSet.has(edge.id)) {
+          updates.push({
+            id: edge.id,
+            width: 2.5,
+            color: {
+              color: (edge as any)._hoverColor || "#6366f1",
+              highlight: (edge as any)._hoverColor || "#6366f1",
+              hover: (edge as any)._hoverColor || "#6366f1",
+            },
+          });
+        } else {
+          updates.push({
+            id: edge.id,
+            width: 0.4,
+            color: {
+              color: "rgba(229, 231, 235, 0.2)", // Dimmed state
+              highlight: (edge as any)._hoverColor || "#6366f1",
+              hover: (edge as any)._hoverColor || "#6366f1",
+            },
+          });
+        }
+      }
+
+      try {
+        networkRef.current.body.data.edges.update(updates);
+      } catch {
+        // Ignore if edge dataset is not available
+      }
+    },
+    blurNode: () => {
+      if (!networkRef.current) return;
+
+      // Reset all edges back to default gray
+      const allEdges = graph.edges;
+      const resets: any[] = [];
+
+      for (const edge of allEdges) {
+        resets.push({
+          id: edge.id,
+          width: 1.5,
+          color: {
+            color: "rgba(156, 163, 175, 0.7)",
+            highlight: (edge as any)._hoverColor || "#6366f1",
+            hover: (edge as any)._hoverColor || "#6366f1",
+          },
+        });
+      }
+
+      try {
+        networkRef.current.body.data.edges.update(resets);
+      } catch {
+        // Ignore if edge dataset is not available
+      }
+    },
+    dragEnd: () => {
+      checkAndRecenter();
     },
   };
 
@@ -823,7 +987,19 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
           </div>
         </div>
       )}
-      <div className="p-4">
+      <div className="p-4 relative">
+        {/* Recenter button */}
+        <button
+          onClick={fitNetwork}
+          title="Recenter graph"
+          className="absolute top-6 right-6 z-10 flex items-center gap-1.5 rounded-lg bg-white/90 dark:bg-gray-800/90 border border-gray-200 dark:border-gray-600 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 shadow-sm backdrop-blur-sm transition-all hover:bg-white dark:hover:bg-gray-700 hover:shadow"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3.8 3.8l4.6 4.6M20.2 3.8l-4.6 4.6M3.8 20.2l4.6-4.6M20.2 20.2l-4.6-4.6" />
+            <circle cx="12" cy="12" r="2" />
+          </svg>
+          Recenter
+        </button>
         <Graph
           key={graphKey}
           events={events}

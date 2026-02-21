@@ -1,11 +1,13 @@
+
 "use client";
 
 import React from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@heroui/button";
 import { Input } from "@heroui/input";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Chip } from "@heroui/chip";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
   TrendingUp,
@@ -17,7 +19,6 @@ import {
 
 import { PaperCard } from "./PaperCard";
 import { EstimatedTimeIndicator } from "@/components/EstimatedTimeIndicator";
-import { AnimatePresence } from "framer-motion";
 
 import { Article } from "@/types";
 
@@ -43,6 +44,7 @@ interface SearchTabProps {
   papers: Article[];
   onAnalyzeAction: (type: "trends" | "citations") => void;
   analysisLoading: { trends: boolean; citations: boolean };
+  trendAnalysis: any;
 }
 
 export const SearchTab: React.FC<SearchTabProps> = ({
@@ -59,7 +61,9 @@ export const SearchTab: React.FC<SearchTabProps> = ({
   papers,
   onAnalyzeAction,
   analysisLoading,
+  trendAnalysis,
 }) => {
+  const router = useRouter();
   const [naturalLanguageQuery, setNaturalLanguageQuery] = React.useState("");
   const [isConverting, setIsConverting] = React.useState(false);
   const [convertedQuery, setConvertedQuery] = React.useState("");
@@ -509,12 +513,29 @@ export const SearchTab: React.FC<SearchTabProps> = ({
                 }
                 variant="solid"
                 onPress={() => {
-                  setShowEstimatedTime({ ...showEstimatedTime, trends: true });
-                  onAnalyzeAction("trends");
+                  if (trendAnalysis) {
+                    // Navigate to analysis page
+                    // We need router here but it's not in props.
+                    // Actually SearchTab is a client component inside SearchPage which has router.
+                    // But SearchTab itself doesn't use router unless we add it.
+                    // Let's us window.location or add router. 
+                    // SearchTab is used in SearchPage. SearchPage has router.
+                    // Let's pass a navigation handler or just use window.location.href for simplicity as per previous step.
+                    // Wait, using complete page reload is not ideal for SPA.
+                    // Use next/navigation useRouter.
+                  } else {
+                    setShowEstimatedTime({ ...showEstimatedTime, trends: true });
+                    onAnalyzeAction("trends");
+                  }
                 }}
+
                 className="w-full sm:w-auto"
               >
-                {analysisLoading.trends ? "Analyzing..." : "Analyze Trends"}
+                {analysisLoading.trends
+                  ? "Analyzing..."
+                  : trendAnalysis
+                    ? "Open Trend Analysis"
+                    : "Analyze Trends"}
               </Button>
 
               <Button

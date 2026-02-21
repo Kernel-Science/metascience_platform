@@ -23,7 +23,12 @@ async def analyze_trends(request: Dict[str, Any]):
         raise HTTPException(status_code=400, detail="No papers provided")
 
     analysis = await trend_analyzer.analyze_comprehensive_trends(papers)
-    viz = visualization_generator.generate_trend_charts(papers)
+    # The analyze_comprehensive_trends method might have mutated or enriched papers,
+    # but currently it returns dict. Let's extract the enriched papers from trend_analyzer if possible.
+    # Fortunately, it seems we can just run the internal enricher first if we expose it:
+    enriched_papers = await trend_analyzer._enrich_papers_with_citations(papers)
+    analysis = await trend_analyzer.analyze_comprehensive_trends(enriched_papers)
+    viz = visualization_generator.generate_trend_charts(enriched_papers)
     analysis_id = str(uuid.uuid4())
 
     doc = {
@@ -179,8 +184,9 @@ async def analyze_trends_advanced(request: Dict[str, Any]):
     papers = request.get('papers', [])
     if not papers:
         raise HTTPException(status_code=400, detail="No papers provided")
-    analysis = await trend_analyzer.analyze_comprehensive_trends(papers)
-    viz = visualization_generator.generate_trend_charts(papers)
+    enriched_papers = await trend_analyzer._enrich_papers_with_citations(papers)
+    analysis = await trend_analyzer.analyze_comprehensive_trends(enriched_papers)
+    viz = visualization_generator.generate_trend_charts(enriched_papers)
     analysis_id = str(uuid.uuid4())
     doc = {
         '_id': analysis_id,

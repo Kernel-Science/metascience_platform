@@ -97,11 +97,16 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
       // Process citation history
       if (citationData.data) {
         citationData.data.forEach((item) => {
+          const paperCount = Array.isArray(item.citation_papers)
+            ? item.citation_papers.length
+            : 0;
           allItems.push({
             id: item.id,
             type: "citation",
             title: item.paper_title || "Citation Analysis",
-            subtitle: `Paper ID: ${item.paper_id}`,
+            subtitle: paperCount > 0
+              ? `${paperCount} papers in network`
+              : `Paper: ${item.paper_id}`,
             data: item,
             created_at: item.created_at,
           });

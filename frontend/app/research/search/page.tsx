@@ -25,23 +25,34 @@ export default function SearchPage() {
     setFilters: setSearchFilters,
     saveSearchToSupabase,
   } = useSearchStore();
-  const { setCitationPapers, setPaperId, setPaperTitle } = useCitationStore();
+
   const {
     setAnalysisType,
     setQuery: setAnalysisQuery,
     setCitationAnalysis,
     setTrendAnalysis,
     saveAnalysisToSupabase,
+    isGeneratingTrend,
+    setIsGeneratingTrend,
+    setTrendGenerationError,
+    trendAnalysis,
   } = useAnalysisStore();
+
+  const {
+    setCitationPapers,
+    setPaperId,
+    setPaperTitle,
+    setCitationGraph,
+    saveCitationToSupabase,
+    isGeneratingNetwork,
+    setIsGeneratingNetwork,
+    networkGenerationError, // Add this
+    setNetworkGenerationError,
+  } = useCitationStore();
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
-  const [analysisLoadingState, setAnalysisLoadingState] = useState<{
-    trends: boolean;
-    citations: boolean;
-  }>({ trends: false, citations: false });
 
   const [showFilters, setShowFilters] = useState(false);
 
@@ -159,40 +170,56 @@ export default function SearchPage() {
     }
   };
 
-  // Track completed analyses so we know when both are done
-  const [completedAnalyses, setCompletedAnalyses] = useState<{
-    trends: boolean;
-    citations: boolean;
-  }>({ trends: false, citations: false });
+  // Logic to handle completion and redirection
+  // We track previous states to detect completion (transition from true -> false)
+  const prevIsGeneratingTrend = React.useRef(isGeneratingTrend);
+  const prevIsGeneratingNetwork = React.useRef(isGeneratingNetwork);
 
-  // Navigate once both are done (or just one if only one was running)
+  // We also want to know if we initiated both analyses to handle the "both complete" scenario
+  // However, with persistent state, "both complete" might happen at different times or across sessions.
+  // For simplicity and robustness, specific redirection takes precedence when an analysis finishes.
+  // If we want to support "wait for both", we can check if the other is currently generating.
+
   useEffect(() => {
-    const bothLoading =
-      !analysisLoadingState.trends && !analysisLoadingState.citations;
-
-    if (!bothLoading) return; // Still loading something
-
-    const { trends: trendsDone, citations: citationsDone } = completedAnalyses;
-
-    if (trendsDone && citationsDone) {
-      // Both finished — navigate to trends (the richer view) and notify about citations
-      showSuccessMessage(
-        "Both analyses completed! Showing trend analysis. Visit Citation Network from the menu to see citation results.",
-      );
-      setCompletedAnalyses({ trends: false, citations: false });
-      router.push("/research/analysis");
-    } else if (trendsDone) {
-      showSuccessMessage("Trend analysis completed successfully!");
-      setCompletedAnalyses({ trends: false, citations: false });
-      router.push("/research/analysis");
-    } else if (citationsDone) {
-      showSuccessMessage(
-        "Citation analysis completed successfully! Redirecting to citation network...",
-      );
-      setCompletedAnalyses({ trends: false, citations: false });
-      router.push("/citation");
+    // Trend analysis finished
+    if (prevIsGeneratingTrend.current && !isGeneratingTrend) {
+      if (!isGeneratingNetwork) {
+        // Only redirect if citation network is not also running, OR if we prioritize trends view
+        // Actually, if both were running and trends finishes first, we might want to wait?
+        // Or just go to trends view and let citation finish in background (which is the goal).
+        // Let's go to trends view immediately when trends finishes.
+        showSuccessMessage("Trend analysis completed!");
+        router.push("/research/analysis");
+      }
     }
-  }, [analysisLoadingState, completedAnalyses]);
+    prevIsGeneratingTrend.current = isGeneratingTrend;
+  }, [isGeneratingTrend, isGeneratingNetwork, router]);
+
+  useEffect(() => {
+    // Citation network finished
+    if (prevIsGeneratingNetwork.current && !isGeneratingNetwork) {
+      // Only redirect if there was no error
+      if (networkGenerationError) {
+        // Error is handled in catch block, prevent redirect
+        prevIsGeneratingNetwork.current = isGeneratingNetwork;
+        return;
+      }
+
+      // If trends is currently running, we might stay here until trends finishes?
+      // Or if trends is NOT running, we redirect to citation page.
+      if (!isGeneratingTrend) {
+        showSuccessMessage("Citation analysis completed!");
+        router.push("/citation");
+      } else {
+        // Trends is still running. We can notify the user but maybe don't redirect yet
+        // because the trends view is usually the primary dashboard.
+        // Or we can just let the trends completion handler handle the redirect.
+        showSuccessMessage("Citation analysis completed! (Trend analysis still in progress)");
+      }
+    }
+    prevIsGeneratingNetwork.current = isGeneratingNetwork;
+  }, [isGeneratingNetwork, isGeneratingTrend, router]);
+
 
   const analyzeData = async (type: "trends" | "citations") => {
     if (papers.length === 0) {
@@ -200,38 +227,40 @@ export default function SearchPage() {
       return;
     }
 
-    setAnalysisLoadingState((prev) => ({ ...prev, [type]: true }));
-
-    // Only set analysis type if the other analysis isn't already running
-    const otherType = type === "trends" ? "citations" : "trends";
-    const otherIsRunning = analysisLoadingState[otherType];
-
-    if (!otherIsRunning) {
-      const analysisType = type === "trends" ? "trend" : "citation";
-      setAnalysisType(analysisType);
-      setAnalysisQuery(query);
-      clearMessages();
+    if (type === "trends") {
+      setIsGeneratingTrend(true);
+      setTrendGenerationError(null);
+    } else {
+      setIsGeneratingNetwork(true);
+      setNetworkGenerationError(null);
     }
 
+    // Only set basic analysis type/query if not already set or completely new
+    // But we should set them to ensure the context is correct.
+    if (type === "trends") {
+      setAnalysisType("trend");
+      setAnalysisQuery(query);
+    } // For citations, we might not need to set redundant analysisType in analysisStore if it's separate
+
     try {
-      let endpoint = type === "trends" ? "trends" : "citations";
-
+      let endpoint = type === "trends" ? "analyze/trends" : "analyze/citation-network-from-papers";
       let requestBody;
-      if (type === "citations") {
-        const dois = papers
-          .filter((paper) => paper.doi)
-          .map((paper) => paper.doi);
 
-        if (dois.length === 0) {
+      if (type === "citations") {
+        // Relaxed validation: check for papers with either DOI or ID
+        const validPapers = papers.filter((paper) => paper.doi || paper.id || paper.paperId);
+
+        if (validPapers.length === 0) {
           showErrorMessage(
-            "No papers with DOIs found. Cannot perform citation analysis.",
+            "No valid papers with IDs found. Cannot perform citation analysis.",
           );
-          setAnalysisLoadingState((prev) => ({ ...prev, [type]: false }));
+          setIsGeneratingNetwork(false);
           return;
         }
 
+        // Send papers instead of just DOIs, so backend can use paperId if DOI is missing
         requestBody = {
-          dois: dois,
+          papers: papers,
           max_references: 50,
           max_citations: 50,
           data_source: "s2",
@@ -240,17 +269,14 @@ export default function SearchPage() {
         requestBody = { papers };
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/analyze/${endpoint}`, {
+      const response = await fetch(`${API_BASE_URL}/api/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
-        showErrorMessage(
-          `Analysis failed: ${response.status} ${response.statusText}`,
-        );
-        return;
+        throw new Error(`Analysis failed: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -272,22 +298,59 @@ export default function SearchPage() {
           console.error("Failed to save trend analysis to Supabase:", error);
         }
       } else {
-        setCitationPapers(papers);
+        // Handle Citation Network data
+        // The backend returns { analysis_id, network_data, ... } directly
+        // It does NOT wrap it in a 'data' property like the other endpoints might
+        const networkData = data.network_data;
 
-        if (papers.length > 0) {
-          setPaperId(papers[0].id);
-          setPaperTitle(papers[0].title);
+        if (networkData) {
+          setCitationPapers(data.papers || papers); // backend might not return papers list, use original
+          if (networkData) {
+            setCitationGraph(networkData, false); // Mark as not saved so it gets saved to history
+          }
+
+          if (papers.length > 0) {
+            setPaperId(papers[0].id);
+            setPaperTitle(papers[0].title);
+          }
+
+          // Save to citation history
+          // We need to ensure state is updated before saving? 
+          // saveCitationToSupabase reads from store (get()). 
+          // Zustand updates are synchronous usually, but better to await if possible?
+          // Since we called setters, store should be updated.
+          try {
+            // Ensure we have the data in store before saving
+            // We just called setters.
+            await saveCitationToSupabase();
+          } catch (error) {
+            console.error("Failed to save citation to Supabase:", error);
+          }
+        } else {
+          // Fallback if structure is different
+          setCitationPapers(papers);
+          if (papers.length > 0) {
+            setPaperId(papers[0].id);
+            setPaperTitle(papers[0].title);
+          }
         }
       }
 
-      // Mark this analysis as completed; navigation is handled by the useEffect
-      setCompletedAnalyses((prev) => ({ ...prev, [type]: true }));
     } catch (err: any) {
-      showErrorMessage(
-        `${type.charAt(0).toUpperCase() + type.slice(1)} analysis failed: ${err.message}`,
-      );
+      const errorMessage =
+        `${type.charAt(0).toUpperCase() + type.slice(1)} analysis failed: ${err.message}`;
+      showErrorMessage(errorMessage);
+      if (type === "trends") {
+        setTrendGenerationError(errorMessage);
+      } else {
+        setNetworkGenerationError(errorMessage);
+      }
     } finally {
-      setAnalysisLoadingState((prev) => ({ ...prev, [type]: false }));
+      if (type === "trends") {
+        setIsGeneratingTrend(false);
+      } else {
+        setIsGeneratingNetwork(false);
+      }
     }
   };
 
@@ -318,7 +381,12 @@ export default function SearchPage() {
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <SearchTab
-            analysisLoading={analysisLoadingState}
+            analysisLoading={{
+              trends: isGeneratingTrend,
+              citations: isGeneratingNetwork,
+            }}
+            trendAnalysis={trendAnalysis}
+
             categories={categories}
             filters={filters}
             loading={loading}

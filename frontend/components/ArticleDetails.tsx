@@ -73,7 +73,9 @@ const ArticleDetails: React.FC<ArticleDetailsProps> = ({ article }) => {
               Journal:
             </span>
             <p className="text-gray-600 dark:text-gray-400">
-              {article.journal}
+              {typeof article.journal === 'string'
+                ? article.journal
+                : (article.journal as any)?.name || String(article.journal)}
             </p>
           </div>
         )}

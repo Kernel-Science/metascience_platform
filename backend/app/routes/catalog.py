@@ -63,7 +63,21 @@ async def search_papers_enhanced(
                 (arxiv_papers if src == 'arxiv' else other_papers).extend(res)
             else:
                 logger.warning(f"Unexpected result type from {src}: {type(res)}")
-
+        if source == 'arxiv' and (not arxiv_papers):
+            logger.warning("ArXiv search returned no results or failed. Triggering Semantic Scholar fallback.")
+            try:
+                # Clean query for S2: Remove "OR" operators as S2 handles natural language better
+                s2_query = query.replace(" OR ", " ").replace(" or ", " ").strip()
+                logger.info(f"Fallback S2 query cleaned: '{s2_query}'")
+                
+                # Fallback to Semantic Scholar with the original limit
+                fallback_results = await api_client.search_semantic_scholar_with_backoff(s2_query, limit=limit)
+                if fallback_results:
+                    logger.info(f"Fallback successful: Retrieved {len(fallback_results)} papers from Semantic Scholar")
+                    other_papers.extend(fallback_results)
+                    sources.append('semantic_scholar_fallback')
+            except Exception as e:
+                logger.error(f"Fallback search failed: {e}")
         logger.info(f"Total papers before filtering - ArXiv: {len(arxiv_papers)}, Others: {len(other_papers)}")
 
         def _filter(ps):
