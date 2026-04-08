@@ -65,8 +65,11 @@ pnpm install
 cp .env.example .env.local
 # Add required environment variables (e.g., Supabase config if needed)
 
-# Start the development server
+# Start the development server if you want the next.js controls visible on the frontend
 pnpm dev
+# If running in prod, build and serve the static files
+pnpm build
+pnpm start
 ```
 Open `http://localhost:3000` to view the application.
 
