@@ -34,9 +34,7 @@ import { useReviewStore } from "@/lib/reviewStore";
 import { EstimatedTimeIndicator } from "@/components/EstimatedTimeIndicator";
 import { AnimatePresence } from "framer-motion";
 
-// Call backend directly to avoid Next.js API route payload limits
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+const UPLOAD_PROXY_URL = "/api/review/upload";
 
 interface ReviewData {
   paper: string | number;
@@ -298,7 +296,7 @@ export default function ReviewPage() {
         }
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/review/upload`, {
+      const response = await fetch(UPLOAD_PROXY_URL, {
         method: "POST",
         body: formData,
       });
