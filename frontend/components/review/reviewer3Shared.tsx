@@ -10,6 +10,7 @@ import { Chip } from "@heroui/chip";
 import { MapPin, SearchX } from "lucide-react";
 
 import { Reviewer3Comment } from "@/lib/reviewStore";
+import { ChatMarkdown } from "@/components/chat/ChatMarkdown";
 
 export type ChipColor = "danger" | "warning" | "secondary" | "default";
 
@@ -77,12 +78,12 @@ export function CommentCard({
         {comment.title && (
           <h4 className="font-medium text-foreground">{comment.title}</h4>
         )}
-        <p className="text-sm text-foreground/80 whitespace-pre-wrap">
-          {comment.comment}
-        </p>
+        <div className="text-sm text-foreground/80 [&_.chat-md]:text-sm [&_.chat-md]:leading-relaxed">
+          <ChatMarkdown>{comment.comment}</ChatMarkdown>
+        </div>
         {comment.cited_text && (
           <blockquote className="border-l-2 border-primary/40 pl-3 text-xs italic text-muted-foreground">
-            &ldquo;{comment.cited_text}&rdquo;
+            <ChatMarkdown>{`"${comment.cited_text}"`}</ChatMarkdown>
           </blockquote>
         )}
       </CardBody>

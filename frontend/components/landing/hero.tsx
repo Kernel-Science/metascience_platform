@@ -37,7 +37,7 @@ export default function Hero() {
           >
             <Button
               as={Link}
-              href="/research?tab=search"
+              href="/research/chat"
               size="lg"
               className="border border-foreground/80 bg-[#E4D344] font-semibold text-[#1D1D1B]"
               endContent={<ArrowRightIcon className="h-5 w-5" />}

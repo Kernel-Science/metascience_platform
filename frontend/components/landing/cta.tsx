@@ -27,7 +27,7 @@ export default function CTA() {
             <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
               <Button
                 as={Link}
-                href="/research/search"
+                href="/research/chat"
                 size="lg"
                 className="rounded-full border border-foreground/75 bg-[#E4D344] px-8 text-base font-semibold text-[#1D1D1B]"
               >

@@ -4,7 +4,6 @@ import React, { useCallback, useEffect, useState } from "react";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Input } from "@heroui/input";
-import { Snippet } from "@heroui/snippet";
 import { Spinner } from "@heroui/spinner";
 import { Chip } from "@heroui/chip";
 import {
@@ -14,7 +13,7 @@ import {
   ModalBody,
   ModalFooter,
 } from "@heroui/modal";
-import { KeyRound, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { Check, Copy, KeyRound, Plus, Trash2, TriangleAlert } from "lucide-react";
 
 interface ApiKey {
   id: string;
@@ -44,6 +43,13 @@ export function ApiKeysManager() {
 
   // Raw secret shown exactly once, right after creation.
   const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const copyKey = async (key: string) => {
+    await navigator.clipboard.writeText(key);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const loadKeys = useCallback(async () => {
     setLoading(true);
@@ -212,14 +218,25 @@ export function ApiKeysManager() {
               </span>
             </div>
             {createdKey && (
-              <Snippet
-                hideSymbol
-                className="w-full"
-                codeString={createdKey}
-                variant="bordered"
-              >
-                <span className="break-all">{createdKey}</span>
-              </Snippet>
+              <div className="flex w-full items-start gap-2 rounded-lg border border-divider bg-content2 p-3">
+                <code className="min-w-0 flex-1 break-all font-mono text-xs leading-relaxed text-foreground">
+                  {createdKey}
+                </code>
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="light"
+                  className="shrink-0"
+                  onPress={() => copyKey(createdKey)}
+                  aria-label="Copy API key"
+                >
+                  {copied ? (
+                    <Check className="h-4 w-4 text-success" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             )}
           </ModalBody>
           <ModalFooter>

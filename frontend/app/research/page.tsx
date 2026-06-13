@@ -8,7 +8,7 @@ export default function ResearchPage() {
 
   useEffect(() => {
     // Redirect to the search page by default
-    router.replace("/research/search");
+    router.replace("/research/chat");
   }, [router]);
 
   return (

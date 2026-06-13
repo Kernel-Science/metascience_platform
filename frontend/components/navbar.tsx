@@ -64,7 +64,7 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   };
 
   const handleGoToApp = () => {
-    router.push("/research/search");
+    router.push("/research/chat");
     setIsMobileMenuOpen(false);
   };
 
