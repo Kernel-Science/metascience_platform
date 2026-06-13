@@ -43,6 +43,7 @@ export async function middleware(request: NextRequest) {
       "/citation",
       "/transparency",
       "/review",
+      "/developer",
       "/profile",
     ];
 

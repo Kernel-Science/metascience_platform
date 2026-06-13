@@ -9,6 +9,7 @@ import { Input } from "@heroui/input";
 import { Tabs, Tab } from "@heroui/tabs";
 import { Divider } from "@heroui/divider";
 import { Tooltip } from "@heroui/tooltip";
+import { Switch } from "@heroui/switch";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
@@ -27,9 +28,10 @@ import {
 import jsPDF from "jspdf";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
-import { Navbar } from "@/components/navbar";
+import { AppShell } from "@/components/app-shell";
 import { Message } from "@/components/research/Message";
 import { FeedbackButton } from "@/components/feedback/FeedbackButton";
+import { Reviewer3Panel } from "@/components/review/Reviewer3Panel";
 import { useReviewStore } from "@/lib/reviewStore";
 import { EstimatedTimeIndicator } from "@/components/EstimatedTimeIndicator";
 import { AnimatePresence } from "framer-motion";
@@ -100,6 +102,13 @@ export default function ReviewPage() {
     reviewResult,
     setReviewResult,
     saveReviewToSupabase,
+    reviewer3Enabled,
+    setReviewer3Enabled,
+    setReviewer3SessionId,
+    setReviewer3Status,
+    setReviewer3Error,
+    setReviewer3PdfUrl,
+    clearReviewer3,
   } = useReviewStore();
 
   // Control the "Provide your paper" tabs based on whether a URL is present
@@ -221,6 +230,42 @@ export default function ReviewPage() {
     return null;
   };
 
+  // Fire-and-forget submission to Reviewer3; the Reviewer3Panel polls the
+  // session until the multi-reviewer critique completes.
+  const submitToReviewer3 = async (file: File) => {
+    clearReviewer3();
+    setReviewer3Status("waiting");
+    // Keep the PDF around so the viewer can render it next to the comments.
+    setReviewer3PdfUrl(URL.createObjectURL(file));
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("review_mode", "author");
+
+      const res = await fetch("/api/review/reviewer3/upload", {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.session_id) {
+        setReviewer3Status("error");
+        setReviewer3Error(
+          data.detail || data.error || `HTTP ${res.status}: submission failed`,
+        );
+        return;
+      }
+
+      setReviewer3SessionId(data.session_id);
+      setReviewer3Status(data.status || "waiting");
+    } catch (err) {
+      setReviewer3Status("error");
+      setReviewer3Error(
+        err instanceof Error ? err.message : "Unknown submission error",
+      );
+    }
+  };
+
   const handleFileUpload = async () => {
     if (!selectedFile && !pdfUrl) {
       showErrorMessage("Please select a file or provide a PDF URL first");
@@ -286,13 +331,32 @@ export default function ReviewPage() {
           clearMessages();
         } catch (downloadError) {
           showErrorMessage(
-            `Failed to download PDF: ${downloadError instanceof Error
-              ? downloadError.message
-              : "Unknown error"
+            `Failed to download PDF: ${
+              downloadError instanceof Error
+                ? downloadError.message
+                : "Unknown error"
             }`,
           );
           setLoading(false);
           return;
+        }
+      }
+
+      // Run the Reviewer3 peer review in parallel with the Gemini assessment.
+      if (reviewer3Enabled) {
+        const r3File = formData.get("file") as File | null;
+        if (
+          r3File &&
+          (r3File.type === "application/pdf" ||
+            r3File.name.toLowerCase().endsWith(".pdf"))
+        ) {
+          void submitToReviewer3(r3File);
+        } else {
+          clearReviewer3();
+          setReviewer3Status("error");
+          setReviewer3Error(
+            "Reviewer3 only accepts PDF files — peer review skipped.",
+          );
         }
       }
 
@@ -828,14 +892,14 @@ export default function ReviewPage() {
 
         // Use weighted formula matching prompt.txt (weights sum to 0.95 for these 8 fields)
         const weightedPdfScore =
-          (reviewData.formal_correctness || 0) / 4 * 0.25 +
-          (reviewData.reproducibility || 0) / 4 * 0.20 +
-          (reviewData.impact || 0) / 3 * 0.15 +
-          (reviewData.novelty || 0) / 5 * 0.15 +
-          (reviewData.writing_clarity || 0) / 4 * 0.10 +
-          (reviewData.writing_grammar || 0) / 3 * 0.05 +
-          (reviewData.writing_fairness || 0) / 3 * 0.025 +
-          (reviewData.interdisciplinarity || 0) / 4 * 0.025;
+          ((reviewData.formal_correctness || 0) / 4) * 0.25 +
+          ((reviewData.reproducibility || 0) / 4) * 0.2 +
+          ((reviewData.impact || 0) / 3) * 0.15 +
+          ((reviewData.novelty || 0) / 5) * 0.15 +
+          ((reviewData.writing_clarity || 0) / 4) * 0.1 +
+          ((reviewData.writing_grammar || 0) / 3) * 0.05 +
+          ((reviewData.writing_fairness || 0) / 3) * 0.025 +
+          ((reviewData.interdisciplinarity || 0) / 4) * 0.025;
         const overallPercentage = (weightedPdfScore / 0.95) * 100;
         const overallColor = getScoreColorRGB(overallPercentage, 100);
 
@@ -1076,6 +1140,7 @@ export default function ReviewPage() {
     setFileName("");
     setMimeType("");
     setReviewResult(null);
+    clearReviewer3();
   };
 
   // Compute display title for header to avoid nested ternaries in JSX
@@ -1126,327 +1191,391 @@ export default function ReviewPage() {
 
   return (
     <ProtectedRoute>
-      <main className="flex flex-col min-h-screen bg-background">
-        <Navbar />
+      <AppShell>
+        <main className="flex flex-col bg-background">
+          <div className="flex-1 container mx-auto px-4 py-10 pt-8 md:pt-10">
+            {/* Messages */}
+            <Message
+              error={error}
+              success={success}
+              onClearMessagesAction={clearMessages}
+            />
 
-        <div className="flex-1 container mx-auto px-4 py-10 md:py-16 pt-36 md:pt-44">
-          {/* Messages */}
-          <Message
-            error={error}
-            success={success}
-            onClearMessagesAction={clearMessages}
-          />
-
-          {/* Top Section: Title */}
-          <div className="mb-6 md:mb-10">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-lg bg-primary/15 text-primary">
-                <FileText className="w-5 h-5" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-                    Paper Assessment
-                  </h1>
-                  <Chip
-                    color="warning"
-                    variant="flat"
-                    size="sm"
-                    className="font-semibold"
-                  >
-                    ALPHA
-                  </Chip>
+            {/* Top Section: Title */}
+            <div className="mb-6 md:mb-10">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-lg bg-primary/15 text-primary">
+                  <FileText className="w-5 h-5" />
                 </div>
-                <p className="text-sm md:text-base text-muted-foreground">
-                  Upload a paper or provide a URL to get a structured AI
-                  assessment.
-                </p>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h1 className="text-2xl md:text-3xl font-bold text-foreground">
+                      Paper Assessment
+                    </h1>
+                    <Chip
+                      color="warning"
+                      variant="flat"
+                      size="sm"
+                      className="font-semibold"
+                    >
+                      ALPHA
+                    </Chip>
+                  </div>
+                  <p className="text-sm md:text-base text-muted-foreground">
+                    Upload a paper or provide a URL to get a structured AI
+                    assessment.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Main Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left: Input Column */}
-            <div className="lg:col-span-4 space-y-6">
-              <Card className="h-full">
-                <CardHeader className="pb-0">
-                  <div className="flex items-center gap-2">
-                    <Upload className="w-4 h-4 text-primary" />
-                    <h3 className="text-lg font-semibold text-foreground">
-                      Provide your paper
-                    </h3>
-                  </div>
-                </CardHeader>
-                <CardBody className="pt-4">
-                  <Tabs
-                    aria-label="paper-input"
-                    variant="underlined"
-                    className="w-full"
-                    selectedKey={inputTab}
-                    onSelectionChange={(key) => setInputTab(String(key))}
-                  >
-                    <Tab key="file" title="Upload file">
-                      <div className="space-y-4">
-                        <label htmlFor="paperFile" className="block">
-                          <input
-                            id="paperFile"
-                            type="file"
-                            accept=".pdf,.tex,.txt,.docx,.md"
-                            className="hidden"
-                            onChange={handleFileSelect}
-                          />
-                          <Button
-                            as={"label"}
-                            htmlFor="paperFile"
-                            color="primary"
-                            variant="solid"
-                            fullWidth
-                            startContent={<Upload className="w-4 h-4" />}
-                          >
-                            Choose file
-                          </Button>
-                        </label>
-
-                        {selectedFile && (
-                          <Card className="bg-content2">
-                            <CardBody className="py-3 px-4">
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <div className="p-2 bg-primary/15 rounded-md">
-                                    <FileText className="w-4 h-4 text-primary" />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-medium text-foreground truncate">
-                                      {selectedFile.name.replace(
-                                        /\.[^/.]+$/,
-                                        "",
-                                      )}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {(
-                                        selectedFile.size /
-                                        1024 /
-                                        1024
-                                      ).toFixed(2)}{" "}
-                                      MB
-                                    </p>
-                                  </div>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  color="danger"
-                                  variant="flat"
-                                  isDisabled={loading}
-                                  startContent={<Trash2 className="w-4 h-4" />}
-                                  onPress={clearSelection}
-                                >
-                                  Clear
-                                </Button>
-                              </div>
-                            </CardBody>
-                          </Card>
-                        )}
-                      </div>
-                    </Tab>
-                    <Tab key="url" title="From URL">
-                      <div className="space-y-4">
-                        <Input
-                          type="url"
-                          label="PDF URL"
-                          placeholder="https://example.com/paper.pdf"
-                          startContent={
-                            <Link2 className="w-4 h-4 text-muted-foreground" />
-                          }
-                          value={pdfUrl ?? ""}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            setPdfUrl(value);
-                            setPaperTitle(
-                              value ? deriveTitleFromUrl(value) : "",
-                            );
-                            if (selectedFile) setSelectedFile(null);
-                          }}
-                        />
-                        {pdfUrl && !selectedFile && (
-                          <Card className="bg-content2">
-                            <CardBody className="py-3 px-4">
-                              <div className="flex items-center justify-between gap-3">
-                                <div className="flex items-center gap-3 min-w-0">
-                                  <div className="p-2 bg-primary/15 rounded-md">
-                                    <FileText className="w-4 h-4 text-primary" />
-                                  </div>
-                                  <div className="min-w-0">
-                                    <p className="text-sm font-medium text-foreground truncate">
-                                      {paperTitle || "PDF from URL"}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground truncate">
-                                      From URL
-                                    </p>
-                                  </div>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  color="danger"
-                                  variant="flat"
-                                  isDisabled={loading}
-                                  startContent={<Trash2 className="w-4 h-4" />}
-                                  onPress={clearSelection}
-                                >
-                                  Clear
-                                </Button>
-                              </div>
-                            </CardBody>
-                          </Card>
-                        )}
-                      </div>
-                    </Tab>
-                  </Tabs>
-
-                  <Divider className="my-6" />
-
-                  <Button
-                    className="w-full"
-                    color="primary"
-                    size="lg"
-                    disabled={(!selectedFile && !pdfUrl) || loading}
-                    onPress={handleFileUpload}
-                  >
-                    {loading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
-                        Assessing...
-                      </>
-                    ) : (
-                      "Assess Paper"
-                    )}
-                  </Button>
-
-                  {/* Immediate feedback: estimated time shown under the Assess button */}
-                  <AnimatePresence>
-                    <div className="mt-4">
-                      <EstimatedTimeIndicator
-                        analysisType="assessment"
-                        estimatedSeconds={estimatedSeconds}
-                        isVisible={loading}
-                      />
+            {/* Main Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left: Input Column */}
+              <div className="lg:col-span-4 space-y-6">
+                <Card className="h-fit lg:sticky lg:top-28">
+                  <CardHeader className="pb-0">
+                    <div className="flex items-center gap-2">
+                      <Upload className="w-4 h-4 text-primary" />
+                      <h3 className="text-lg font-semibold text-foreground">
+                        Provide your paper
+                      </h3>
                     </div>
-                  </AnimatePresence>
+                  </CardHeader>
+                  <CardBody className="pt-4">
+                    <Tabs
+                      aria-label="paper-input"
+                      variant="underlined"
+                      className="w-full"
+                      selectedKey={inputTab}
+                      onSelectionChange={(key) => setInputTab(String(key))}
+                    >
+                      <Tab key="file" title="Upload file">
+                        <div className="space-y-4">
+                          <label htmlFor="paperFile" className="block">
+                            <input
+                              id="paperFile"
+                              type="file"
+                              accept=".pdf,.tex,.txt,.docx,.md"
+                              className="hidden"
+                              onChange={handleFileSelect}
+                            />
+                            <Button
+                              as={"label"}
+                              htmlFor="paperFile"
+                              color="primary"
+                              variant="solid"
+                              fullWidth
+                              startContent={<Upload className="w-4 h-4" />}
+                            >
+                              Choose file
+                            </Button>
+                          </label>
 
-                  <p className="text-xs text-muted-foreground mt-3">
-                    Supported: PDF, LaTeX, TXT, DOCX, MD
-                  </p>
-                </CardBody>
-              </Card>
-            </div>
+                          {selectedFile && (
+                            <Card className="bg-content2">
+                              <CardBody className="py-3 px-4">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className="p-2 bg-primary/15 rounded-md">
+                                      <FileText className="w-4 h-4 text-primary" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium text-foreground truncate">
+                                        {selectedFile.name.replace(
+                                          /\.[^/.]+$/,
+                                          "",
+                                        )}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {(
+                                          selectedFile.size /
+                                          1024 /
+                                          1024
+                                        ).toFixed(2)}{" "}
+                                        MB
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    color="danger"
+                                    variant="flat"
+                                    isDisabled={loading}
+                                    startContent={
+                                      <Trash2 className="w-4 h-4" />
+                                    }
+                                    onPress={clearSelection}
+                                  >
+                                    Clear
+                                  </Button>
+                                </div>
+                              </CardBody>
+                            </Card>
+                          )}
+                        </div>
+                      </Tab>
+                      <Tab key="url" title="From URL">
+                        <div className="space-y-4">
+                          <Input
+                            type="url"
+                            label="PDF URL"
+                            placeholder="https://example.com/paper.pdf"
+                            startContent={
+                              <Link2 className="w-4 h-4 text-muted-foreground" />
+                            }
+                            value={pdfUrl ?? ""}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setPdfUrl(value);
+                              setPaperTitle(
+                                value ? deriveTitleFromUrl(value) : "",
+                              );
+                              if (selectedFile) setSelectedFile(null);
+                            }}
+                          />
+                          {pdfUrl && !selectedFile && (
+                            <Card className="bg-content2">
+                              <CardBody className="py-3 px-4">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className="p-2 bg-primary/15 rounded-md">
+                                      <FileText className="w-4 h-4 text-primary" />
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium text-foreground truncate">
+                                        {paperTitle || "PDF from URL"}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground truncate">
+                                        From URL
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    size="sm"
+                                    color="danger"
+                                    variant="flat"
+                                    isDisabled={loading}
+                                    startContent={
+                                      <Trash2 className="w-4 h-4" />
+                                    }
+                                    onPress={clearSelection}
+                                  >
+                                    Clear
+                                  </Button>
+                                </div>
+                              </CardBody>
+                            </Card>
+                          )}
+                        </div>
+                      </Tab>
+                    </Tabs>
 
-            {/* Right: Results Column */}
-            <div className="lg:col-span-8 space-y-6">
-              {/* Results Header */}
-              <Card className="overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-primary/10 to-secondary/10">
-                  <div className="w-full py-2">
-                    <div className="flex flex-wrap items-center justify-between gap-4">
-                      <div className="min-w-0 flex-1">
-                        <h2 className="text-xl md:text-2xl font-bold text-foreground">
-                          {reviewData
-                            ? "Assessment ready"
-                            : "No assessment yet"}
-                        </h2>
-                        <p className="text-sm text-muted-foreground truncate">
-                          {displayTitle}
+                    <Divider className="my-6" />
+
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4 text-secondary" />
+                          <p className="text-sm font-medium text-foreground">
+                            Reviewer3 peer review
+                          </p>
+                          <Chip color="warning" variant="flat" size="sm">
+                            BETA
+                          </Chip>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Adds an independent multi-reviewer critique (PDF only,
+                          takes a few minutes).
                         </p>
                       </div>
+                      <Switch
+                        aria-label="Enable Reviewer3 peer review"
+                        isSelected={reviewer3Enabled}
+                        onValueChange={setReviewer3Enabled}
+                        size="sm"
+                      />
+                    </div>
 
-                      <div className="flex items-center gap-2">
-                        {reviewData?.status && (
-                          <Chip color="primary" variant="flat">
-                            {reviewData.status}
-                          </Chip>
-                        )}
-                        {reviewData?.reviewer && (
-                          <Chip color="secondary" variant="flat">
-                            Assessed by {String(reviewData.reviewer)}
-                          </Chip>
-                        )}
-                        {reviewData?.confidence !== undefined && (
-                          <Chip
-                            color={confidenceColor}
-                            variant="flat"
-                            startContent={<Star className="w-4 h-4" />}
-                          >
-                            AI Confidence{" "}
-                            {(reviewData.confidence * 10).toFixed(0)}%
-                          </Chip>
-                        )}
+                    <Button
+                      className="w-full"
+                      color="primary"
+                      size="lg"
+                      disabled={(!selectedFile && !pdfUrl) || loading}
+                      onPress={handleFileUpload}
+                    >
+                      {loading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                          Assessing...
+                        </>
+                      ) : (
+                        "Assess Paper"
+                      )}
+                    </Button>
+
+                    {/* Immediate feedback: estimated time shown under the Assess button */}
+                    <AnimatePresence>
+                      <div className="mt-4">
+                        <EstimatedTimeIndicator
+                          analysisType="assessment"
+                          estimatedSeconds={estimatedSeconds}
+                          isVisible={loading}
+                        />
+                      </div>
+                    </AnimatePresence>
+
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Supported: PDF, LaTeX, TXT, DOCX, MD
+                    </p>
+                  </CardBody>
+                </Card>
+              </div>
+
+              {/* Right: Results Column */}
+              <div className="lg:col-span-8 space-y-6">
+                {/* Results Header */}
+                <Card className="overflow-hidden">
+                  <CardHeader className="bg-gradient-to-r from-primary/10 to-secondary/10">
+                    <div className="w-full py-2">
+                      <div className="flex flex-wrap items-center justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <h2 className="text-xl md:text-2xl font-bold text-foreground">
+                            {reviewData
+                              ? "Assessment ready"
+                              : "No assessment yet"}
+                          </h2>
+                          <p className="text-sm text-muted-foreground truncate">
+                            {displayTitle}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {reviewData?.status && (
+                            <Chip color="primary" variant="flat">
+                              {reviewData.status}
+                            </Chip>
+                          )}
+                          {reviewData?.reviewer && (
+                            <Chip color="secondary" variant="flat">
+                              Assessed by {String(reviewData.reviewer)}
+                            </Chip>
+                          )}
+                          {reviewData?.confidence !== undefined && (
+                            <Chip
+                              color={confidenceColor}
+                              variant="flat"
+                              startContent={<Star className="w-4 h-4" />}
+                            >
+                              AI Confidence{" "}
+                              {(reviewData.confidence * 10).toFixed(0)}%
+                            </Chip>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </CardHeader>
+                  </CardHeader>
 
-                <CardBody>
-                  {reviewData ? (
-                    <div className="space-y-8">
-                      {/* Quick Overall Score */}
-                      {(() => {
-                        // Weighted formula matching prompt.txt:
-                        // formal_correctness: 0.25 (max 4), reproducibility: 0.20 (max 4),
-                        // impact: 0.15 (max 3), novelty: 0.15 (max 5),
-                        // writing_clarity: 0.10 (max 4), writing_grammar: 0.05 (max 3),
-                        // writing_fairness: 0.025 (max 3), interdisciplinarity: 0.025 (max 4)
-                        // Note: writing_consistency (0.05) is not a separate field;
-                        // its weight is redistributed proportionally.
-                        const weightedScore =
-                          (reviewData.formal_correctness || 0) / 4 * 0.25 +
-                          (reviewData.reproducibility || 0) / 4 * 0.20 +
-                          (reviewData.impact || 0) / 3 * 0.15 +
-                          (reviewData.novelty || 0) / 5 * 0.15 +
-                          (reviewData.writing_clarity || 0) / 4 * 0.10 +
-                          (reviewData.writing_grammar || 0) / 3 * 0.05 +
-                          (reviewData.writing_fairness || 0) / 3 * 0.025 +
-                          (reviewData.interdisciplinarity || 0) / 4 * 0.025;
-                        // Scale to 100 (weights sum to 0.95, so normalize)
-                        const pct = (weightedScore / 0.95) * 100;
-                        return (
-                          <>
-                            <Card className="bg-content2">
-                              <CardBody className="py-5 px-6">
-                                <div className="flex items-center justify-between gap-4 flex-wrap">
-                                  <div className="flex items-center gap-2">
-                                    <Star className="w-5 h-5 text-primary" />
-                                    <h4 className="font-semibold text-foreground">
-                                      Overall Score
-                                    </h4>
-                                    <Tooltip
-                                      content={
-                                        <div className="max-w-xs p-1 text-xs leading-relaxed">
-                                          <p className="font-semibold mb-1">Weighted formula:</p>
-                                          <p className="mb-1">Overall = 100 × Σ(weight × score / max_scale)</p>
-                                          <ul className="space-y-0.5 text-foreground/60 list-none">
-                                            <li>Formal Correctness: 25% (scale 1–4)</li>
-                                            <li>Reproducibility: 20% (scale 1–4)</li>
-                                            <li>Impact: 15% (scale 1–3)</li>
-                                            <li>Novelty: 15% (scale 1–5)</li>
-                                            <li>Writing Clarity: 10% (scale 1–4)</li>
-                                            <li>Writing Grammar: 5% (scale 1–3)</li>
-                                            <li>Writing Fairness: 2.5% (scale 1–3)</li>
-                                            <li>Interdisciplinarity: 2.5% (scale 1–4)</li>
-                                          </ul>
-                                        </div>
-                                      }
-                                      placement="top"
-                                      showArrow
-                                    >
-                                      <button
-                                        type="button"
-                                        className="text-muted-foreground hover:text-primary transition-colors"
-                                        aria-label="How is the overall score calculated?"
+                  <CardBody>
+                    {reviewData ? (
+                      <div className="space-y-8">
+                        {/* Quick Overall Score */}
+                        {(() => {
+                          // Weighted formula matching prompt.txt:
+                          // formal_correctness: 0.25 (max 4), reproducibility: 0.20 (max 4),
+                          // impact: 0.15 (max 3), novelty: 0.15 (max 5),
+                          // writing_clarity: 0.10 (max 4), writing_grammar: 0.05 (max 3),
+                          // writing_fairness: 0.025 (max 3), interdisciplinarity: 0.025 (max 4)
+                          // Note: writing_consistency (0.05) is not a separate field;
+                          // its weight is redistributed proportionally.
+                          const weightedScore =
+                            ((reviewData.formal_correctness || 0) / 4) * 0.25 +
+                            ((reviewData.reproducibility || 0) / 4) * 0.2 +
+                            ((reviewData.impact || 0) / 3) * 0.15 +
+                            ((reviewData.novelty || 0) / 5) * 0.15 +
+                            ((reviewData.writing_clarity || 0) / 4) * 0.1 +
+                            ((reviewData.writing_grammar || 0) / 3) * 0.05 +
+                            ((reviewData.writing_fairness || 0) / 3) * 0.025 +
+                            ((reviewData.interdisciplinarity || 0) / 4) * 0.025;
+                          // Scale to 100 (weights sum to 0.95, so normalize)
+                          const pct = (weightedScore / 0.95) * 100;
+                          return (
+                            <>
+                              <Card className="bg-content2">
+                                <CardBody className="py-5 px-6">
+                                  <div className="flex items-center justify-between gap-4 flex-wrap">
+                                    <div className="flex items-center gap-2">
+                                      <Star className="w-5 h-5 text-primary" />
+                                      <h4 className="font-semibold text-foreground">
+                                        Overall Score
+                                      </h4>
+                                      <Tooltip
+                                        content={
+                                          <div className="max-w-xs p-1 text-xs leading-relaxed">
+                                            <p className="font-semibold mb-1">
+                                              Weighted formula:
+                                            </p>
+                                            <p className="mb-1">
+                                              Overall = 100 × Σ(weight × score /
+                                              max_scale)
+                                            </p>
+                                            <ul className="space-y-0.5 text-foreground/60 list-none">
+                                              <li>
+                                                Formal Correctness: 25% (scale
+                                                1–4)
+                                              </li>
+                                              <li>
+                                                Reproducibility: 20% (scale 1–4)
+                                              </li>
+                                              <li>Impact: 15% (scale 1–3)</li>
+                                              <li>Novelty: 15% (scale 1–5)</li>
+                                              <li>
+                                                Writing Clarity: 10% (scale 1–4)
+                                              </li>
+                                              <li>
+                                                Writing Grammar: 5% (scale 1–3)
+                                              </li>
+                                              <li>
+                                                Writing Fairness: 2.5% (scale
+                                                1–3)
+                                              </li>
+                                              <li>
+                                                Interdisciplinarity: 2.5% (scale
+                                                1–4)
+                                              </li>
+                                            </ul>
+                                          </div>
+                                        }
+                                        placement="top"
+                                        showArrow
                                       >
-                                        <HelpCircle className="w-4 h-4" />
-                                      </button>
-                                    </Tooltip>
+                                        <button
+                                          type="button"
+                                          className="text-muted-foreground hover:text-primary transition-colors"
+                                          aria-label="How is the overall score calculated?"
+                                        >
+                                          <HelpCircle className="w-4 h-4" />
+                                        </button>
+                                      </Tooltip>
+                                    </div>
+                                    <Chip
+                                      color={
+                                        pct >= 80
+                                          ? "success"
+                                          : pct >= 60
+                                            ? "warning"
+                                            : pct >= 40
+                                              ? "secondary"
+                                              : "danger"
+                                      }
+                                      variant="flat"
+                                    >
+                                      {pct.toFixed(1)}%
+                                    </Chip>
                                   </div>
-                                  <Chip
+                                  <Progress
+                                    className="mt-3"
+                                    value={pct}
                                     color={
                                       pct >= 80
                                         ? "success"
@@ -1456,136 +1585,143 @@ export default function ReviewPage() {
                                             ? "secondary"
                                             : "danger"
                                     }
-                                    variant="flat"
-                                  >
-                                    {pct.toFixed(1)}%
-                                  </Chip>
+                                  />
+                                </CardBody>
+                              </Card>
+                              {/* Human review comparison note */}
+                              <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-default-100/60 border border-divider/40">
+                                <Users className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
+                                <p className="text-xs text-foreground/60">
+                                  <span className="font-medium text-foreground/80">
+                                    Human review comparison
+                                  </span>{" "}
+                                  — Side-by-side comparison with human expert
+                                  scores is a planned feature. Currently, only
+                                  AI-generated scores are available.
+                                </p>
+                              </div>
+                            </>
+                          );
+                        })()}
+
+                        <Tabs aria-label="results" variant="underlined">
+                          <Tab key="overview" title="Overview">
+                            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                              {renderScoreCard(
+                                "Formal Correctness",
+                                reviewData.formal_correctness,
+                                4,
+                                reviewData.score_justifications
+                                  ?.formal_correctness,
+                              )}
+                              {renderScoreCard(
+                                "Reproducibility",
+                                reviewData.reproducibility,
+                                4,
+                                reviewData.score_justifications
+                                  ?.reproducibility,
+                              )}
+                              {renderScoreCard(
+                                "Impact",
+                                reviewData.impact,
+                                3,
+                                reviewData.score_justifications?.impact,
+                              )}
+                              {renderScoreCard(
+                                "Novelty",
+                                reviewData.novelty,
+                                5,
+                                reviewData.score_justifications?.novelty,
+                              )}
+                              {renderScoreCard(
+                                "Writing Clarity",
+                                reviewData.writing_clarity,
+                                4,
+                                reviewData.score_justifications
+                                  ?.writing_clarity,
+                              )}
+                              {renderScoreCard(
+                                "Writing Grammar",
+                                reviewData.writing_grammar,
+                                3,
+                                reviewData.score_justifications
+                                  ?.writing_grammar,
+                              )}
+                              {renderScoreCard(
+                                "Writing Fairness",
+                                reviewData.writing_fairness,
+                                3,
+                                reviewData.score_justifications
+                                  ?.writing_fairness,
+                              )}
+                              {renderScoreCard(
+                                "Interdisciplinarity",
+                                reviewData.interdisciplinarity,
+                                4,
+                                reviewData.score_justifications
+                                  ?.interdisciplinarity,
+                              )}
+                            </div>
+                          </Tab>
+                          <Tab key="assessment" title="Assessment">
+                            <Card>
+                              <CardBody className="p-6">
+                                <div className="prose prose-gray dark:prose-invert max-w-none">
+                                  {reviewData.review_text ? (
+                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                      {reviewData.review_text}
+                                    </ReactMarkdown>
+                                  ) : (
+                                    <p className="mb-6 text-muted-foreground italic">
+                                      No detailed assessment text available.
+                                    </p>
+                                  )}
                                 </div>
-                                <Progress
-                                  className="mt-3"
-                                  value={pct}
-                                  color={
-                                    pct >= 80
-                                      ? "success"
-                                      : pct >= 60
-                                        ? "warning"
-                                        : pct >= 40
-                                          ? "secondary"
-                                          : "danger"
-                                  }
-                                />
                               </CardBody>
                             </Card>
-                            {/* Human review comparison note */}
-                            <div className="flex items-start gap-2 px-4 py-3 rounded-lg bg-default-100/60 border border-divider/40">
-                              <Users className="w-4 h-4 text-muted-foreground mt-0.5 shrink-0" />
-                              <p className="text-xs text-foreground/60">
-                                <span className="font-medium text-foreground/80">Human review comparison</span> — Side-by-side comparison with human expert scores is a planned feature. Currently, only AI-generated scores are available.
+                          </Tab>
+                          <Tab key="export" title="Export">
+                            <div className="flex flex-col items-start gap-3">
+                              <Button
+                                color="secondary"
+                                startContent={<Download className="w-5 h-5" />}
+                                onPress={generateReviewPDF}
+                              >
+                                Download PDF Report
+                              </Button>
+                              <p className="text-xs text-muted-foreground">
+                                The report includes scores, metadata, and the
+                                full assessment.
                               </p>
                             </div>
-                          </>
-                        );
-                      })()}
+                          </Tab>
+                        </Tabs>
+                      </div>
+                    ) : (
+                      <div className="text-center py-10 text-muted-foreground">
+                        <p className="mb-2 font-medium">No results yet</p>
+                        <p className="text-sm">
+                          Start by uploading a file or entering a PDF URL, then
+                          click Assess Paper.
+                        </p>
+                      </div>
+                    )}
+                  </CardBody>
+                </Card>
+              </div>
+            </div>
 
-                      <Tabs aria-label="results" variant="underlined">
-                        <Tab key="overview" title="Overview">
-                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {renderScoreCard(
-                              "Formal Correctness",
-                              reviewData.formal_correctness,
-                              4,
-                              reviewData.score_justifications?.formal_correctness,
-                            )}
-                            {renderScoreCard(
-                              "Reproducibility",
-                              reviewData.reproducibility,
-                              4,
-                              reviewData.score_justifications?.reproducibility,
-                            )}
-                            {renderScoreCard("Impact", reviewData.impact, 3,
-                              reviewData.score_justifications?.impact,
-                            )}
-                            {renderScoreCard("Novelty", reviewData.novelty, 5,
-                              reviewData.score_justifications?.novelty,
-                            )}
-                            {renderScoreCard(
-                              "Writing Clarity",
-                              reviewData.writing_clarity,
-                              4,
-                              reviewData.score_justifications?.writing_clarity,
-                            )}
-                            {renderScoreCard(
-                              "Writing Grammar",
-                              reviewData.writing_grammar,
-                              3,
-                              reviewData.score_justifications?.writing_grammar,
-                            )}
-                            {renderScoreCard(
-                              "Writing Fairness",
-                              reviewData.writing_fairness,
-                              3,
-                              reviewData.score_justifications?.writing_fairness,
-                            )}
-                            {renderScoreCard(
-                              "Interdisciplinarity",
-                              reviewData.interdisciplinarity,
-                              4,
-                              reviewData.score_justifications?.interdisciplinarity,
-                            )}
-                          </div>
-                        </Tab>
-                        <Tab key="assessment" title="Assessment">
-                          <Card>
-                            <CardBody className="p-6">
-                              <div className="prose prose-gray dark:prose-invert max-w-none">
-                                {reviewData.review_text ? (
-                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                                    {reviewData.review_text}
-                                  </ReactMarkdown>
-                                ) : (
-                                  <p className="mb-6 text-muted-foreground italic">
-                                    No detailed assessment text available.
-                                  </p>
-                                )}
-                              </div>
-                            </CardBody>
-                          </Card>
-                        </Tab>
-                        <Tab key="export" title="Export">
-                          <div className="flex flex-col items-start gap-3">
-                            <Button
-                              color="secondary"
-                              startContent={<Download className="w-5 h-5" />}
-                              onPress={generateReviewPDF}
-                            >
-                              Download PDF Report
-                            </Button>
-                            <p className="text-xs text-muted-foreground">
-                              The report includes scores, metadata, and the full
-                              assessment.
-                            </p>
-                          </div>
-                        </Tab>
-                      </Tabs>
-                    </div>
-                  ) : (
-                    <div className="text-center py-10 text-muted-foreground">
-                      <p className="mb-2 font-medium">No results yet</p>
-                      <p className="text-sm">
-                        Start by uploading a file or entering a PDF URL, then
-                        click Assess Paper.
-                      </p>
-                    </div>
-                  )}
-                </CardBody>
-              </Card>
+            {/* Reviewer3 multi-reviewer peer review: full-width so the
+              comments + PDF split view gets the whole page */}
+            <div className="mt-6">
+              <Reviewer3Panel />
             </div>
           </div>
-        </div>
 
-        {/* Floating Feedback Button */}
-        <FeedbackButton tabName="review" />
-      </main>
+          {/* Floating Feedback Button */}
+          <FeedbackButton tabName="review" />
+        </main>
+      </AppShell>
     </ProtectedRoute>
   );
 }

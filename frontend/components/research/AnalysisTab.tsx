@@ -6,6 +6,7 @@ import { TrendingUp } from "lucide-react";
 import AIInsights from "@/components/charts/AIInsights";
 import TimelineChart from "@/components/charts/TimelineChart";
 import BarChart from "@/components/charts/BarChart";
+import ThemeClusters from "@/components/charts/ThemeClusters";
 
 interface AnalysisTabProps {
   trendAnalysis: any;
@@ -73,6 +74,9 @@ export const AnalysisTab: React.FC<AnalysisTabProps> = ({
             <TrendingUp className="text-[var(--fqxi-ink)]" />
             Trend Analysis Results
           </h2>
+
+          {/* Data-driven theme clusters (embedding-based) */}
+          <ThemeClusters clusters={trendAnalysis.analysis?.clusters} />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div>

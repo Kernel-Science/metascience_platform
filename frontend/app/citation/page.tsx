@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Settings, BookOpen, HelpCircle, Eye, List, X } from "lucide-react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
-import { Navbar } from "@/components/navbar";
+import { AppShell } from "@/components/app-shell";
 import CitationSearch from "@/components/CitationSearch";
 import NetworkGraph from "@/components/NetworkGraph";
 import AnalysisOptions from "@/components/AnalysisOptions";
@@ -155,10 +155,9 @@ function CitationPageContent() {
   };
 
   return (
-    <div className="brand-app-shell">
-      <Navbar />
+    <AppShell>
 
-      <main className="container mx-auto px-6 py-24 max-w-7xl">
+      <main className="container mx-auto px-6 py-10 max-w-7xl">
         {/* Main Content */}
         <div className="grid grid-cols-12 gap-8">
           {/* Sidebar Controls */}
@@ -218,7 +217,7 @@ function CitationPageContent() {
                     </h2>
                     <p className="text-foreground/75">
                       {viewMode === "network"
-                        ? "Interactive network visualization. Seed papers are indigo, cited papers are purple, and citing papers are cyan."
+                        ? "Interactive map. Nodes are colored by theme cluster (toggle Theme/Role in the panel); seed papers are shown as ★ stars."
                         : `${allNodes.length} papers found in the citation network`}
                     </p>
                   </div>
@@ -377,7 +376,7 @@ function CitationPageContent() {
         {/* Floating Feedback Button */}
         <FeedbackButton tabName="citation" />
       </main>
-    </div>
+    </AppShell>
   );
 }
 

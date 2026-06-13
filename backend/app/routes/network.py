@@ -1,8 +1,11 @@
 from fastapi import APIRouter, HTTPException
+from typing import Any, Dict
 import asyncio
 router = APIRouter()
 from ..services.research_client import api_client
 from ..services.citation_network_core import CitationNetworkAnalyzer
+from ..services.citation_network_openalex import network_builder
+from ..services.clustering import cluster_papers
 
 SOURCE_MAP = {"s2": "semantic_scholar", "oa": "openalex", "oc": "opencitations"}
 
@@ -12,7 +15,13 @@ async def get_citation_network(data_source: str, dois: str, cited: str = 'top', 
         if data_source not in SOURCE_MAP:
             raise HTTPException(status_code=400, detail=f"Unsupported data source '{data_source}'. Supported: {list(SOURCE_MAP.keys())}")
         api_source = SOURCE_MAP[data_source]
-        doi_list = [d.strip() for d in dois.split(',')]
+        doi_list = [d.strip() for d in dois.split(',') if d.strip()]
+
+        # Primary: OpenAlex ID-based builder. Legacy path below is the fallback.
+        net = await network_builder.build(doi_list, cited=cited, citing=citing)
+        if not net.get('_no_seeds'):
+            return {'nodes': net['nodes'], 'edges': net['edges'], 'papers': net['papers'], 'stats': net['stats'], 'clusters': net.get('clusters', [])}
+
         analyzer = CitationNetworkAnalyzer()
 
         seed_papers, references, citations = [], [], []
@@ -59,6 +68,18 @@ async def post_citation_network(request: dict):
 
         cited = 'none' if max_references == 0 else 'all' if max_references >= 1000 else 'top'
         citing = 'none' if max_citations == 0 else 'all' if max_citations >= 1000 else 'top'
+
+        # Primary: OpenAlex ID-based builder (reliable edges). Falls through to
+        # the legacy S2/OpenAlex path below only if no seed resolves.
+        net = await network_builder.build([doi], cited=cited, citing=citing)
+        if not net.get('_no_seeds'):
+            return {'success': True, 'data': {
+                'papers': net['papers'],
+                'network': {'nodes': net['nodes'], 'edges': net['edges']},
+                'seed_paper_ids': net['seed_paper_ids'],
+                'stats': net['stats'],
+                'clusters': net.get('clusters', []),
+            }}
 
         paper = await api_client.get_paper_by_doi(doi, source=source) or \
                 await api_client.get_paper_by_doi(doi, source='semantic_scholar') or \
@@ -117,6 +138,17 @@ async def post_citation_network_multiple(request: dict):
 
         cited = 'none' if max_references == 0 else 'all' if max_references >= 1000 else 'top'
         citing = 'none' if max_citations == 0 else 'all' if max_citations >= 1000 else 'top'
+
+        # Primary: OpenAlex ID-based builder. Legacy path below is the fallback.
+        net = await network_builder.build(valid_dois, cited=cited, citing=citing)
+        if not net.get('_no_seeds'):
+            return {'success': True, 'data': {
+                'papers': net['papers'],
+                'network': {'nodes': net['nodes'], 'edges': net['edges']},
+                'seed_paper_ids': net['seed_paper_ids'],
+                'stats': net['stats'],
+                'clusters': net.get('clusters', []),
+            }, 'message': f"Citation network generated for {len(net['seed_paper_ids'])}/{len(valid_dois)} papers"}
 
         # OPTIMIZATION: Parallel paper fetching with fallback sources
         async def fetch_paper_with_fallback(doi):
@@ -227,6 +259,53 @@ async def post_citation_network_multiple(request: dict):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+@router.post("/citation-network/expand")
+async def expand_citation_node(request: dict):
+    """Expand one node: build its neighborhood and re-cluster the merged graph.
+
+    Body: {id|doi, existing: [{id,title,abstract,citationCount,year}], cited, citing}
+    `existing` is the caller's current node set, sent so we can re-cluster the
+    whole (existing + new) graph and return consistent theme assignments.
+    """
+    node_id = request.get('id') or request.get('doi')
+    if not node_id:
+        raise HTTPException(status_code=400, detail="Node id is required")
+    cited = request.get('cited', 'top')
+    citing = request.get('citing', 'top')
+
+    net = await network_builder.build([node_id], cited=cited, citing=citing, top_n=12)
+    if net.get('_no_seeds'):
+        raise HTTPException(status_code=404, detail=f"Could not resolve node '{node_id}'")
+
+    # Re-cluster the merged set (existing nodes + the new neighborhood), deduped.
+    merged: Dict[str, Dict[str, Any]] = {}
+    for p in (request.get('existing') or []) + net['papers']:
+        pid = p.get('id')
+        if pid and pid not in merged:
+            merged[pid] = {
+                'id': pid,
+                'title': p.get('title', ''),
+                'abstract': p.get('abstract', ''),
+                'citationCount': p.get('citationCount') or p.get('citationsCount') or 0,
+                'year': p.get('year', 0),
+            }
+    merged_list = list(merged.values())
+    labels, clusters = await cluster_papers(merged_list, min_papers=8, max_k=8, per_cluster=8)
+    assignments = {merged_list[i]['id']: labels[i] for i in range(len(merged_list))}
+
+    return {
+        'success': True,
+        'data': {
+            'nodes': net['nodes'],
+            'edges': net['edges'],
+            'papers': net['papers'],
+            'expanded_from': node_id,
+            'assignments': assignments,
+            'clusters': clusters,
+        },
+    }
+
+
 @router.post("/analyze/citation-network-from-papers")
 async def post_citation_network_from_papers(request: dict):
     try:
@@ -241,6 +320,22 @@ async def post_citation_network_from_papers(request: dict):
 
         cited = 'none' if max_references == 0 else 'all' if max_references >= 1000 else 'top'
         citing = 'none' if max_citations == 0 else 'all' if max_citations >= 1000 else 'top'
+
+        # Primary: OpenAlex ID-based builder, seeded from the papers' identifiers.
+        seed_refs = []
+        for p in papers:
+            ref = p.get('doi') or p.get('arxiv_id') or p.get('openalex_id') or p.get('id')
+            if ref:
+                seed_refs.append(ref)
+        net = await network_builder.build(seed_refs, cited=cited, citing=citing)
+        if not net.get('_no_seeds'):
+            return {'success': True, 'data': {
+                'papers': net['papers'],
+                'network': {'nodes': net['nodes'], 'edges': net['edges']},
+                'seed_paper_ids': net['seed_paper_ids'],
+                'stats': net['stats'],
+                'clusters': net.get('clusters', []),
+            }, 'message': f"Citation network generated for {len(net['seed_paper_ids'])} papers"}
 
         analyzer = CitationNetworkAnalyzer()
         seed_papers = []

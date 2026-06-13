@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from typing import Dict, Any
 from ..services.paper_review import paper_review_service
+from ..services.reviewer3 import reviewer3_service, Reviewer3Error
+from ..config import GEMINI_REVIEW_MODEL
 import logging
 
 # Configure logging
@@ -64,6 +66,73 @@ async def review_paper_upload(file: UploadFile = File(...)) -> Dict[str, Any]:
             detail=f"Error processing file: {str(e)}"
         )
 
+# --- Reviewer3: external multi-reviewer peer review -----------------------
+# Async flow: upload returns a session_id immediately; the client polls the
+# GET endpoint until status is "completed" (comments populated) or "error".
+
+@router.post("/review/reviewer3/upload")
+async def reviewer3_upload(
+    file: UploadFile = File(...),
+    review_mode: str = Form("author"),
+) -> Dict[str, Any]:
+    """
+    Submit a PDF to Reviewer3 for multi-reviewer peer review (fire-and-forget).
+    Returns the session_id to poll for status and comments.
+    """
+    file_extension = file.filename.split('.')[-1].lower() if file.filename else ''
+    if file_extension != 'pdf':
+        raise HTTPException(
+            status_code=400,
+            detail="Reviewer3 only accepts PDF files"
+        )
+
+    file_content = await file.read()
+    if not file_content:
+        raise HTTPException(status_code=400, detail="Empty file provided")
+
+    try:
+        logger.info(f"Submitting {file.filename} to Reviewer3 (mode={review_mode})")
+        result = await reviewer3_service.submit_review(
+            file_content=file_content,
+            filename=file.filename or "paper.pdf",
+            title=(file.filename or "paper.pdf").rsplit('.', 1)[0],
+            review_mode=review_mode,
+        )
+        return {"success": True, "status": "waiting", **result}
+    except Reviewer3Error as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
+
+
+@router.get("/review/reviewer3/{session_id}")
+async def reviewer3_status(session_id: str) -> Dict[str, Any]:
+    """
+    Poll a Reviewer3 session: status (waiting/processing/completed/error)
+    plus ranked comments once completed.
+    """
+    try:
+        return await reviewer3_service.get_review(session_id)
+    except Reviewer3Error as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
+
+
+@router.delete("/review/reviewer3/{session_id}")
+async def reviewer3_delete(session_id: str) -> Dict[str, Any]:
+    """Permanently delete a Reviewer3 session and its data."""
+    try:
+        return await reviewer3_service.delete_review(session_id)
+    except Reviewer3Error as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
+
+
+@router.post("/review/reviewer3/{session_id}/share")
+async def reviewer3_share(session_id: str) -> Dict[str, Any]:
+    """Generate (or rotate) a password-protected share URL for a session."""
+    try:
+        return await reviewer3_service.create_share_link(session_id)
+    except Reviewer3Error as e:
+        raise HTTPException(status_code=e.status_code, detail=str(e))
+
+
 @router.get("/review/config")
 async def get_review_config() -> Dict[str, str]:
     """
@@ -88,7 +157,7 @@ async def get_review_config() -> Dict[str, str]:
         )
 
 @router.get("/review/health")
-async def review_health_check() -> Dict[str, str]:
+async def review_health_check() -> Dict[str, Any]:
     """
     Health check endpoint for the review service
     """
@@ -103,7 +172,11 @@ async def review_health_check() -> Dict[str, str]:
         return {
             "status": "healthy",
             "service": "paper_review",
-            "model": "gemini-2.5-pro"
+            "model": GEMINI_REVIEW_MODEL,
+            "reviewer3": {
+                "configured": reviewer3_service.is_configured,
+                "missing": reviewer3_service.missing_config,
+            },
         }
     except Exception as e:
         logger.error(f"Health check failed: {str(e)}")

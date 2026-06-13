@@ -22,13 +22,11 @@ async def analyze_trends(request: Dict[str, Any]):
     if not papers:
         raise HTTPException(status_code=400, detail="No papers provided")
 
+    # Papers from search already carry citation counts (OpenAlex/INSPIRE), so we
+    # don't re-fetch from Semantic Scholar; trend clustering reuses the search's
+    # cached embeddings.
     analysis = await trend_analyzer.analyze_comprehensive_trends(papers)
-    # The analyze_comprehensive_trends method might have mutated or enriched papers,
-    # but currently it returns dict. Let's extract the enriched papers from trend_analyzer if possible.
-    # Fortunately, it seems we can just run the internal enricher first if we expose it:
-    enriched_papers = await trend_analyzer._enrich_papers_with_citations(papers)
-    analysis = await trend_analyzer.analyze_comprehensive_trends(enriched_papers)
-    viz = visualization_generator.generate_trend_charts(enriched_papers)
+    viz = visualization_generator.generate_trend_charts(papers)
     analysis_id = str(uuid.uuid4())
 
     doc = {
@@ -184,9 +182,8 @@ async def analyze_trends_advanced(request: Dict[str, Any]):
     papers = request.get('papers', [])
     if not papers:
         raise HTTPException(status_code=400, detail="No papers provided")
-    enriched_papers = await trend_analyzer._enrich_papers_with_citations(papers)
-    analysis = await trend_analyzer.analyze_comprehensive_trends(enriched_papers)
-    viz = visualization_generator.generate_trend_charts(enriched_papers)
+    analysis = await trend_analyzer.analyze_comprehensive_trends(papers)
+    viz = visualization_generator.generate_trend_charts(papers)
     analysis_id = str(uuid.uuid4())
     doc = {
         '_id': analysis_id,

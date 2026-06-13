@@ -1,137 +1,145 @@
 from fastapi import APIRouter, HTTPException
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 import uuid
 import logging
 
 from ..config import RESEARCH_CATEGORIES
 from ..store import insert_many
-from ..services.research_client import api_client
+from ..services.search.schema import SearchIntent
+from ..services.search.orchestrator import run_search
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Frontend "source" values -> connector source ids. semantic_scholar has no
+# dedicated connector yet, so it falls through to the full multi-source set.
+_SOURCE_MAP = {"arxiv": "arxiv", "openalex": "openalex", "inspire": "inspire", "ads": "ads"}
+
 
 @router.get("/categories")
 async def get_research_categories():
     logger.info("Fetching research categories")
     return {"categories": RESEARCH_CATEGORIES}
 
+
+async def _persist(papers: List[Dict[str, Any]], query: str) -> None:
+    """Tag + store papers (best effort; never fails the request)."""
+    if not papers:
+        return
+    ts = datetime.now().isoformat()
+    for i, p in enumerate(papers):
+        p["search_query"] = query
+        p["retrieved_at"] = ts
+        p.setdefault("_id", str(uuid.uuid4()))
+        p["relevance_rank"] = p.get("relevance_rank", i + 1)
+    try:
+        await insert_many("papers", papers)
+    except Exception as e:  # noqa: BLE001
+        logger.warning("persist failed: %s", e)
+
+
+def _response(query: str, result: Dict[str, Any], filters: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "papers": result["papers"],
+        "total_found": result["total_found"],
+        "returned": result["returned"],
+        "offset": result.get("offset", 0),
+        "has_more": result.get("has_more", False),
+        "sources_used": result["sources_used"],
+        "reranked": result["reranked"],
+        "errors": result["errors"],
+        "query": query,
+        "filters": filters,
+        "intent": result["intent"],
+    }
+
+
 @router.get("/search")
-async def search_papers_enhanced(
+async def search_papers(
     query: str,
-    category: str | None = None,
+    category: Optional[str] = None,
     limit: int = 100,
-    source: str = "arxiv",
+    offset: int = 0,
+    source: str = "all",
     min_citations: int = 0,
-    year_from: int | None = None,
-    year_to: int | None = None,
+    year_from: Optional[int] = None,
+    year_to: Optional[int] = None,
 ):
-    logger.info(f"Starting enhanced paper search - Query: '{query}', Source: {source}, Category: {category}, Limit: {limit}")
-    logger.debug(f"Search filters - Min citations: {min_citations}, Year range: {year_from}-{year_to}")
+    """Back-compat search: builds a basic intent from flat params and runs the
+    full multi-source + dedup + rerank pipeline. The advanced path is POST.
+    `offset` pages through the cached ranking ("load more")."""
+    intent = SearchIntent(
+        topics=[query] if query else [],
+        canonical_query=query,
+        field=category if category in RESEARCH_CATEGORIES else None,
+        date_from=f"{year_from}-01-01" if year_from else None,
+        date_to=f"{year_to}-12-31" if year_to else None,
+        min_citations=min_citations or None,
+        sort="relevance",
+    )
+    sources = None if source in (None, "", "all") else [_SOURCE_MAP.get(source, source)]
+    try:
+        result = await run_search(intent, limit=limit, offset=offset, sources=sources)
+    except Exception as e:  # noqa: BLE001
+        logger.error("Search failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
+
+    if offset == 0:
+        await _persist(result["papers"], query)
+    return _response(
+        query,
+        result,
+        {
+            "category": category,
+            "min_citations": min_citations,
+            "year_range": f"{year_from or 'any'}-{year_to or 'any'}",
+            "source": source,
+        },
+    )
+
+
+@router.post("/search")
+async def search_papers_advanced(request: Dict[str, Any]):
+    """Advanced search: accepts a full structured ``intent`` so precise queries
+    (boolean terms, authors, arXiv categories, dates, sort) survive end-to-end.
+
+    Body: {"intent": {...SearchIntent...}, "limit": int, "sources": [ids]}.
+    Falls back to a flat ``query`` field if no intent is supplied.
+    """
+    intent_data = request.get("intent")
+    try:
+        if intent_data:
+            intent = SearchIntent(**intent_data)
+        else:
+            q = (request.get("query") or "").strip()
+            intent = SearchIntent(topics=[q] if q else [], canonical_query=q)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=400, detail=f"Invalid intent: {str(e)}")
+
+    limit = int(request.get("limit", 100))
+    offset = int(request.get("offset", 0))
+    sources = request.get("sources") or None
+    if isinstance(sources, list):
+        sources = [_SOURCE_MAP.get(s, s) for s in sources]
 
     try:
-        tasks, sources = [], []
+        result = await run_search(intent, limit=limit, offset=offset, sources=sources)
+    except Exception as e:  # noqa: BLE001
+        logger.error("Advanced search failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Search error: {str(e)}")
 
-        if source in ["all", "arxiv"]:
-            logger.info("Adding ArXiv search to tasks")
-            tasks.append(api_client.search_arxiv_enhanced(query, category, max_results=limit))
-            sources.append('arxiv')
-
-        if source in ["all", "openalex"]:
-            logger.info("Adding OpenAlex search to tasks")
-            tasks.append(api_client.search_openalex_enhanced(query, per_page=limit))
-            sources.append('openalex')
-
-        if source in ["all", "semantic_scholar"]:
-            logger.info("Adding Semantic Scholar search to tasks")
-            tasks.append(api_client.search_semantic_scholar_with_backoff(query, limit=limit))
-            sources.append('semantic_scholar')
-
-        logger.info(f"Executing {len(tasks)} search tasks for sources: {sources}")
-        import asyncio
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-
-        logger.info(f"Completed all search tasks, processing {len(results)} results")
-
-        arxiv_papers, other_papers = [], []
-        for src, res in zip(sources, results):
-            if isinstance(res, Exception):
-                logger.error(f"Error in {src} search: {res}")
-                continue
-            elif isinstance(res, list):
-                paper_count = len(res)
-                logger.info(f"Retrieved {paper_count} papers from {src}")
-                (arxiv_papers if src == 'arxiv' else other_papers).extend(res)
-            else:
-                logger.warning(f"Unexpected result type from {src}: {type(res)}")
-        if source == 'arxiv' and (not arxiv_papers):
-            logger.warning("ArXiv search returned no results or failed. Triggering Semantic Scholar fallback.")
-            try:
-                # Clean query for S2: Remove "OR" operators as S2 handles natural language better
-                s2_query = query.replace(" OR ", " ").replace(" or ", " ").strip()
-                logger.info(f"Fallback S2 query cleaned: '{s2_query}'")
-                
-                # Fallback to Semantic Scholar with the original limit
-                fallback_results = await api_client.search_semantic_scholar_with_backoff(s2_query, limit=limit)
-                if fallback_results:
-                    logger.info(f"Fallback successful: Retrieved {len(fallback_results)} papers from Semantic Scholar")
-                    other_papers.extend(fallback_results)
-                    sources.append('semantic_scholar_fallback')
-            except Exception as e:
-                logger.error(f"Fallback search failed: {e}")
-        logger.info(f"Total papers before filtering - ArXiv: {len(arxiv_papers)}, Others: {len(other_papers)}")
-
-        def _filter(ps):
-            return [
-                p for p in ps
-                if p.get('citationCount', 0) >= min_citations
-                and (not year_from or p.get('year', 0) >= year_from)
-                and (not year_to or p.get('year', 0) <= year_to)
-            ]
-
-        filtered_arxiv = _filter(arxiv_papers)
-        filtered_others = _filter(other_papers)
-
-        logger.info(f"Papers after filtering - ArXiv: {len(filtered_arxiv)}, Others: {len(filtered_others)}")
-
-        filtered_others.sort(key=lambda x: (x.get('citationCount', 0), x.get('year', 0)), reverse=True)
-        logger.debug("Sorted non-ArXiv papers by citation count and year")
-
-        all_papers = filtered_arxiv + filtered_others
-
-        logger.info(f"Starting deduplication process for {len(all_papers)} papers")
-        unique, seen = [], set()
-        for p in all_papers:
-            title = (p.get('title', '') or '').lower().strip()
-            title = title.replace('on the ', '').replace('a ', '').replace('the ', '')
-            if title not in seen and len(title) > 10:
-                unique.append(p)
-                seen.add(title)
-
-        logger.info(f"After deduplication: {len(unique)} unique papers remain")
-
-        ts = datetime.now().isoformat()
-        for i, p in enumerate(unique):
-            p['search_query'] = query
-            p['retrieved_at'] = ts
-            p['_id'] = str(uuid.uuid4())
-            p['relevance_rank'] = i + 1
-
-        if unique:
-            logger.info(f"Inserting {len(unique)} papers into database")
-            await insert_many('papers', unique)
-        else:
-            logger.warning("No papers to insert into database")
-
-        final_papers = unique[:limit]
-        logger.info(f"Returning {len(final_papers)} papers (limited from {len(unique)} total)")
-
-        return {
-            "papers": final_papers,
-            "total_found": len(unique),
-            "sources_used": sources,
-            "query": query,
-            "filters": {"category": category, "min_citations": min_citations, "year_range": f"{year_from or 'any'}-{year_to or 'any'}"}
-        }
-    except Exception as e:
-        logger.error(f"Enhanced search error: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Enhanced search error: {str(e)}")
+    query = intent.canonical_query or intent.semantic_text()
+    if offset == 0:
+        await _persist(result["papers"], query)
+    return _response(
+        query,
+        result,
+        {
+            "category": intent.field,
+            "min_citations": intent.min_citations or 0,
+            "year_range": f"{intent.year_from() or 'any'}-{intent.year_to() or 'any'}",
+            "sort": intent.sort,
+            "arxiv_categories": intent.arxiv_categories,
+        },
+    )

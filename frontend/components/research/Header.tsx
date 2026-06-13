@@ -41,7 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
     } else if (tabId === "review") {
       router.push("/review");
     } else if (tabId === "Methods") {
-      router.push("/methods");
+      router.push("/docs");
     } else if (
       tabId === "search" ||
       tabId === "analysis" ||
@@ -167,7 +167,7 @@ export const Header: React.FC<HeaderProps> = ({
                 },
                 {
                   id: "Methods",
-                  label: "Methods",
+                  label: "Docs",
                   icon: Shield,
                   disabled: false,
                 },

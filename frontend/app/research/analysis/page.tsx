@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Button } from "@heroui/button";
 import { RefreshCw } from "lucide-react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import { Navbar } from "@/components/navbar";
+import { AppShell } from "@/components/app-shell";
 import { FeedbackButton } from "@/components/feedback/FeedbackButton";
 import { AnalysisTab } from "@/components/research/AnalysisTab";
 import { useAnalysisStore } from "@/lib/analysisStore";
@@ -78,8 +78,7 @@ export default function AnalysisPage() {
 
   return (
     <ProtectedRoute>
-      <div className="brand-app-shell">
-        <Navbar />
+      <AppShell>
 
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex justify-between items-center mb-6">
@@ -105,7 +104,7 @@ export default function AnalysisPage() {
 
           <FeedbackButton tabName="analysis" />
         </main>
-      </div>
+      </AppShell>
     </ProtectedRoute>
   );
 }

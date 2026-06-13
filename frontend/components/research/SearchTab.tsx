@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import { PaperCard } from "./PaperCard";
+import { IntentChips } from "./IntentChips";
 import { EstimatedTimeIndicator } from "@/components/EstimatedTimeIndicator";
 
 import { Article } from "@/types";
@@ -34,7 +35,7 @@ interface SearchTabProps {
   query: string;
   setQueryAction: (query: string) => void;
   loading: boolean;
-  onSearchAction: (customQuery?: string) => void; // Allow passing custom query
+  onSearchAction: (customQuery?: string, intent?: any) => void; // query + optional structured intent
   filters: Filters;
   onFilterChangeAction: (name: keyof Filters, value: string) => void;
   onClearFiltersAction: () => void;
@@ -45,6 +46,11 @@ interface SearchTabProps {
   onAnalyzeAction: (type: "trends" | "citations") => void;
   analysisLoading: { trends: boolean; citations: boolean };
   trendAnalysis: any;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMoreAction?: () => void;
+  activeIntent?: any; // how the executed search was interpreted (editable chips)
+  onIntentChangeAction?: (newIntent: any) => void;
 }
 
 export const SearchTab: React.FC<SearchTabProps> = ({
@@ -62,6 +68,11 @@ export const SearchTab: React.FC<SearchTabProps> = ({
   onAnalyzeAction,
   analysisLoading,
   trendAnalysis,
+  hasMore,
+  loadingMore,
+  onLoadMoreAction,
+  activeIntent,
+  onIntentChangeAction,
 }) => {
   const router = useRouter();
   const [naturalLanguageQuery, setNaturalLanguageQuery] = React.useState("");
@@ -109,7 +120,7 @@ export const SearchTab: React.FC<SearchTabProps> = ({
   return (
     <motion.div
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-6 mt-20"
+      className="space-y-6 mt-4"
       initial={{ opacity: 0, y: 20 }}
     >
       <div className="backdrop-blur-md bg-white/10 border border-white/20 rounded-2xl shadow-xl shadow-black/10 p-8">
@@ -417,9 +428,10 @@ export const SearchTab: React.FC<SearchTabProps> = ({
                     }
                   >
                     <option value="all">All Sources</option>
-                    <option value="arxiv">ArXiv</option>
+                    <option value="arxiv">arXiv</option>
                     <option value="openalex">OpenAlex</option>
-                    <option value="semantic_scholar">Semantic Scholar</option>
+                    <option value="inspire">INSPIRE-HEP</option>
+                    <option value="ads">NASA ADS</option>
                   </select>
                 </div>
 
@@ -560,6 +572,15 @@ export const SearchTab: React.FC<SearchTabProps> = ({
             </div>
           </div>
 
+          {/* Interpreted intent (editable chips) */}
+          {activeIntent && onIntentChangeAction && (
+            <IntentChips
+              intent={activeIntent}
+              onChangeAction={onIntentChangeAction}
+              disabled={loading || loadingMore}
+            />
+          )}
+
           {/* Estimated Time Indicators */}
           <AnimatePresence>
             <div className="space-y-3 mb-6">
@@ -588,6 +609,20 @@ export const SearchTab: React.FC<SearchTabProps> = ({
               />
             ))}
           </div>
+
+          {/* Load more (pagination) */}
+          {hasMore && (
+            <div className="flex justify-center mt-6">
+              <Button
+                isLoading={loadingMore}
+                size="lg"
+                variant="bordered"
+                onPress={onLoadMoreAction}
+              >
+                {loadingMore ? "Loading…" : "Load more results"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </motion.div>
@@ -659,9 +694,11 @@ export const SearchTab: React.FC<SearchTabProps> = ({
       }
     }
 
-    // Set the converted query and trigger search
+    // Set the converted query and trigger search, carrying the full structured
+    // intent so precise queries (boolean terms, authors, categories, dates,
+    // sort) survive end-to-end instead of being flattened to a keyword string.
     setQueryAction(convertedQuery);
-    onSearchAction(convertedQuery);
+    onSearchAction(convertedQuery, suggestedFilters?.intent);
 
     // Hide the converted query section after applying
     setShowConvertedQuery(false);

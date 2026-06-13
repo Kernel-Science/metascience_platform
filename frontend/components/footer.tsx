@@ -1,7 +1,25 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 export const Footer = () => {
+  const pathname = usePathname();
+
+  // App pages use the fixed-viewport sidebar shell (AppShell) — no footer
+  // there. It stays on the landing/marketing/legal/auth pages.
+  const APP_PREFIXES = [
+    "/research",
+    "/citation",
+    "/review",
+    "/docs",
+    "/developer",
+    "/profile",
+  ];
+
+  if (APP_PREFIXES.some((p) => pathname.startsWith(p))) return null;
+
   return (
     <footer className="mt-auto w-full border-t border-foreground/15 bg-content1/65 backdrop-blur-sm">
       <div className="mx-auto max-w-7xl px-6 py-8">

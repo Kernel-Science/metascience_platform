@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import { Navbar } from "@/components/navbar";
+import { AppShell } from "@/components/app-shell";
 import { Message } from "@/components/research/Message";
 import { FeedbackButton } from "@/components/feedback/FeedbackButton";
 import { SearchTab } from "@/components/research/SearchTab";
@@ -13,6 +13,7 @@ import { useCitationStore } from "@/lib/citationStore";
 import { useAnalysisStore } from "@/lib/analysisStore";
 
 const API_BASE_URL = "";
+const PAGE_SIZE = 100;
 
 export default function SearchPage() {
   const router = useRouter();
@@ -66,6 +67,19 @@ export default function SearchPage() {
     yearTo: "",
   });
 
+  // How the executed search was interpreted (editable intent chips).
+  const [activeIntent, setActiveIntent] = useState<any>(null);
+
+  // Pagination ("load more")
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const offsetRef = React.useRef(0);
+  const lastSearchRef = React.useRef<{
+    query?: string;
+    intent?: any;
+    filters: Filters;
+  } | null>(null);
+
   useEffect(() => {
     initializeApp();
   }, []);
@@ -100,33 +114,80 @@ export default function SearchPage() {
     setTimeout(() => setError(""), 8000);
   };
 
-  const searchPapers = async (customQuery?: string) => {
+  // Build the fetch for a search descriptor + offset (legacy GET or intent POST).
+  const buildSearchRequest = (
+    desc: { query?: string; intent?: any; filters: Filters },
+    offset: number,
+  ): Promise<Response> => {
+    if (desc.intent) {
+      // Advanced path: full structured intent; manual filters take precedence.
+      const merged: Record<string, any> = { ...desc.intent };
+
+      if (desc.filters.category) merged.field = desc.filters.category;
+      if (desc.filters.minCitations)
+        merged.min_citations =
+          parseInt(desc.filters.minCitations, 10) || merged.min_citations;
+      if (desc.filters.yearFrom)
+        merged.date_from = `${desc.filters.yearFrom}-01-01`;
+      if (desc.filters.yearTo) merged.date_to = `${desc.filters.yearTo}-12-31`;
+
+      const sources =
+        desc.filters.source && desc.filters.source !== "all"
+          ? [desc.filters.source]
+          : undefined;
+
+      return fetch(`${API_BASE_URL}/api/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          intent: merged,
+          limit: PAGE_SIZE,
+          offset,
+          sources,
+        }),
+      });
+    }
+
+    const params = new URLSearchParams({
+      query: (desc.query || "").trim(),
+      limit: String(PAGE_SIZE),
+      offset: String(offset),
+    });
+
+    if (desc.filters.source !== "all")
+      params.append("source", desc.filters.source);
+    if (desc.filters.category) params.append("category", desc.filters.category);
+    if (desc.filters.minCitations)
+      params.append("min_citations", desc.filters.minCitations);
+    if (desc.filters.yearFrom) params.append("year_from", desc.filters.yearFrom);
+    if (desc.filters.yearTo) params.append("year_to", desc.filters.yearTo);
+
+    return fetch(`${API_BASE_URL}/api/search?${params}`);
+  };
+
+  const searchPapers = async (customQuery?: string, intent?: any) => {
     const searchQuery = customQuery || query;
 
-    if (!searchQuery.trim()) {
+    if (!intent && !searchQuery.trim()) {
       showErrorMessage("Please enter a search query");
       return;
     }
 
+    // Remember this search so "Load more" can repeat it at a higher offset.
+    const desc = { query: searchQuery.trim(), intent, filters: { ...filters } };
+    lastSearchRef.current = desc;
+    offsetRef.current = 0;
+
     setLoading(true);
     clearMessages();
     setPapers([]);
+    setHasMore(false);
+    setActiveIntent(null);
     setCitationAnalysis(null);
     setTrendAnalysis(null);
 
     try {
-      const params = new URLSearchParams({
-        query: searchQuery.trim(),
-      });
-
-      if (filters.source !== "all") params.append("source", filters.source);
-      if (filters.category) params.append("category", filters.category);
-      if (filters.minCitations)
-        params.append("min_citations", filters.minCitations);
-      if (filters.yearFrom) params.append("year_from", filters.yearFrom);
-      if (filters.yearTo) params.append("year_to", filters.yearTo);
-
-      const response = await fetch(`${API_BASE_URL}/api/search?${params}`);
+      const response = await buildSearchRequest(desc, 0);
 
       if (!response.ok) {
         showErrorMessage(
@@ -140,6 +201,8 @@ export default function SearchPage() {
       if (data.papers && data.papers.length > 0) {
         setPapers(data.papers);
         setSearchFilters(filters);
+        setHasMore(!!data.has_more);
+        setActiveIntent(data.intent || null);
 
         try {
           await saveSearchToSupabase();
@@ -149,7 +212,7 @@ export default function SearchPage() {
         }
 
         showSuccessMessage(
-          `Found ${data.papers.length} papers from ${data.sources_used?.join(", ") || "multiple sources"
+          `Found ${data.total_found ?? data.papers.length} papers from ${data.sources_used?.join(", ") || "multiple sources"
           }`,
         );
 
@@ -168,6 +231,49 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadMore = async () => {
+    const desc = lastSearchRef.current;
+
+    if (loadingMore || !hasMore || !desc) return;
+
+    setLoadingMore(true);
+    const nextOffset = offsetRef.current + PAGE_SIZE;
+
+    try {
+      const response = await buildSearchRequest(desc, nextOffset);
+
+      if (!response.ok) {
+        showErrorMessage("Failed to load more results.");
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.papers && data.papers.length > 0) {
+        // Read current papers from the store to avoid a stale closure.
+        const current = useSearchStore.getState().papers;
+
+        setPapers([...current, ...data.papers]);
+        offsetRef.current = nextOffset;
+        setHasMore(!!data.has_more);
+      } else {
+        setHasMore(false);
+      }
+    } catch {
+      showErrorMessage("Failed to load more results.");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  // Re-run the search with an edited intent (from the chips). The chip edits are
+  // authoritative, so this drives a fresh search via the structured-intent path.
+  const applyIntent = (newIntent: any) => {
+    if (loading || loadingMore) return;
+    setActiveIntent(newIntent);
+    searchPapers(newIntent.canonical_query || "", newIntent);
   };
 
   // Logic to handle completion and redirection
@@ -370,8 +476,7 @@ export default function SearchPage() {
 
   return (
     <ProtectedRoute>
-      <div className="brand-app-shell">
-        <Navbar />
+      <AppShell>
 
         <Message
           error={error}
@@ -392,6 +497,10 @@ export default function SearchPage() {
             loading={loading}
             papers={papers}
             query={query}
+            hasMore={hasMore}
+            loadingMore={loadingMore}
+            activeIntent={activeIntent}
+            onIntentChangeAction={applyIntent}
             setQueryAction={setQuery}
             setShowFiltersAction={setShowFilters}
             showFilters={showFilters}
@@ -399,11 +508,12 @@ export default function SearchPage() {
             onClearFiltersAction={clearFilters}
             onFilterChangeAction={handleFilterChange}
             onSearchAction={searchPapers}
+            onLoadMoreAction={loadMore}
           />
 
           <FeedbackButton tabName="search" />
         </main>
-      </div>
+      </AppShell>
     </ProtectedRoute>
   );
 }

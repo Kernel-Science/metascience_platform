@@ -1,104 +1,162 @@
 # FQxI Metascience Platform
 
-> A comprehensive open-source research analysis platform combining a modern Next.js frontend with a powerful Python/FastAPI backend to help academics, researchers, and curious individuals understand scientific literature through AI-driven insights and analytics.
+> An open-source research platform that helps academics and curious minds search, map, and evaluate scientific literature with AI assistance. A Next.js web app sits on top of a Python/FastAPI engine that unifies multiple scholarly databases (ArXiv, OpenAlex, INSPIRE-HEP, NASA ADS) and modern AI models.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Try it here https://metascience.fqxi.org
+Live instance: **https://metascience.fqxi.org**
 
-## 🌟 Overview
+---
 
-The **Metascience Platform** consists of two main components working together:
+## ✨ Features
 
-1.  **Frontend (`/frontend`)**: A Next.js 15 application providing an intuitive interface for searching papers, visualizing citation networks, and viewing AI-generated insights.
-2.  **Backend (`/backend`)**: A Python/FastAPI service that integrates with multiple academic data sources (ArXiv, OpenAlex, Semantic Scholar) and AI models (Claude 4.5 Sonnet, Google Gemini 3 Flash) to power the analysis.
+- **🤖 Assistant** — a conversational research agent (Claude) that searches, builds citation networks, analyses trends, and assesses papers, rendering rich results inline.
+- **🔍 Multi-source search** — one query fans out to **ArXiv, OpenAlex, INSPIRE-HEP, and NASA ADS**, then results are deduplicated and reranked for relevance.
+- **🕸️ Citation networks** — interactive citation graphs built on an OpenAlex identifier backbone, with Semantic Scholar / OpenCitations for citation data.
+- **📈 Trend analysis** — theme clustering plus an AI-written synthesis of how a field is evolving.
+- **📝 Paper assessment** — automated, peer-review-style scoring of an uploaded paper (Gemini), with per-criterion justifications.
+- **🧑‍💻 Public Developer API** — generate an API key and call the same engines from your own projects (see [Developer API](#-developer-api)).
 
-### Key Features
-- **🔍 Multi-Database Search**: Unified search across ArXiv, Semantic Scholar, and OpenAlex.
-- **🤖 AI-Driven Insights**: Natural language query processing and automated paper reviews using Claude 4.5 Sonnet and Gemini 3 Flash.
-- **🕸️ Citation Network Analysis**: Visualize relationships between papers and identify influential research.
-- **📊 Advanced Analytics**: Trend discovery, author collaboration networks, and key metrics.
+## 🏗️ Architecture
 
-## 🚀 Quick Start
+```
+┌─────────────────────────┐        ┌─────────────────────────┐
+│  frontend/ (Next.js 15) │  HTTP  │  backend/ (FastAPI)     │
+│  • App Router UI        │ ─────▶ │  • search orchestrator  │
+│  • /api proxy routes    │        │  • citation network     │
+│  • /api/v1 public API   │        │  • trends + clustering  │
+└───────────┬─────────────┘        │  • AI paper review      │
+            │                      └───────────┬─────────────┘
+            │ auth + per-user data             │ literature + AI
+            ▼                                  ▼
+   ┌──────────────────┐            ArXiv · OpenAlex · INSPIRE-HEP
+   │  Supabase        │            NASA ADS · Semantic Scholar
+   │  (Postgres+Auth) │            Anthropic Claude · Google Gemini
+   └──────────────────┘
+```
+
+- **Frontend** (`/frontend`) — Next.js 15 (App Router) + HeroUI/Tailwind. Hosts the UI, thin `/api` proxy routes to the engine, and the public `/api/v1` Developer API.
+- **Backend** (`/backend`) — Python/FastAPI engine that orchestrates the literature sources, citation-network builder, trend clustering, and AI review.
+- **Supabase** — authentication and per-user data (chat history, saved reviews, API keys, feedback) under row-level security.
+
+## 🚀 Quick start
 
 ### Prerequisites
-- **Node.js**: 18.x or higher
-- **Python**: 3.11+ or 3.13+
-- **pnpm** (recommended) or npm/yarn
-- **Anthropic API Key** (for AI features)
-- **Google API Key** (for Gemini features)
+- **Node.js** 18+ and **pnpm** (or npm)
+- **Python** 3.11+ (3.13 supported)
+- A **Supabase** project (free tier is fine)
+- **Anthropic API key** (Assistant, query understanding, trends)
+- **Google AI API key** (paper review + embeddings)
 
-### Installation & Setup
-
-Clone the repository:
+### 1. Clone
 ```bash
 git clone https://github.com/Kernel-Science/Metascience_Platform.git
 cd Metascience_Platform
 ```
 
-#### 1. Backend Setup
-Navigate to the backend directory and start the server:
-
+### 2. Backend
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate  # Windows: .\.venv\Scripts\Activate.ps1
+source .venv/bin/activate           # Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
-# Configure environment
-cp .env.example .env
-# Edit .env to add your ANTHROPIC_API_KEY and GOOGLE_API_KEY
-
-# Start the server
-uvicorn app.main:app --reload
+cp .env.example .env                # then edit .env (see table below)
+uvicorn app.main:app --reload       # http://localhost:8000
 ```
-The backend API will be available at `http://localhost:8000`.
 
-#### 2. Frontend Setup
-In a new terminal, navigate to the frontend directory:
+### 3. Supabase (database & auth)
+In your Supabase project's **SQL editor**, run the migration files in
+`frontend/` (order doesn't matter, but run all four):
 
+```
+supabase_migration_feedback.sql
+supabase_migration_chat.sql
+supabase_migration_reviewer3.sql
+supabase_migration_api_keys.sql
+```
+
+For profile avatars, create a public Storage bucket named **`avatars`**.
+Enable the Email and (optionally) Google auth providers under **Authentication > Providers**.
+
+### 4. Frontend
 ```bash
 cd frontend
 pnpm install
-
-# Configure environment
-cp .env.example .env.local
-# Add required environment variables (e.g., Supabase config if needed)
-
-# Start the development server if you want the next.js controls visible on the frontend
-pnpm dev
-# If running in prod, build and serve the static files
-pnpm build
-pnpm start
-```
-Open `http://localhost:3000` to view the application.
-
-## 📁 Repository Structure
-
-```
-metascience-platform/
-├── frontend/           # Next.js Frontend Application
-│   ├── app/            # Application routes and pages
-│   ├── components/     # UI Components
-│   └── ...
-├── backend/            # FastAPI Backend Service
-│   ├── app/            # Application logic (routes, services)
-│   ├── services/       # AI & Data integrations
-│   └── ...
-└── README.md           # This file
+cp .env.example .env.local          # then edit .env.local (see table below)
+pnpm dev                            # http://localhost:3000
 ```
 
-## 📚 Documentation
+For production: `pnpm build && pnpm start`.
 
-For detailed documentation on each component, please refer to their respective README files:
-- [Frontend Documentation](frontend/README.md)
-- [Backend Documentation](backend/Readme.md)
+## 🔑 Environment variables
+
+### Backend (`backend/.env`)
+| Variable | Required | Purpose |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | ✅ | Claude — query understanding, trends, rerank fallback |
+| `GOOGLE_API_KEY` | ✅ | Gemini — paper review + embeddings |
+| `ANTHROPIC_MODEL` | – | Override the Claude model (default `claude-sonnet-4-6`) |
+| `GEMINI_REVIEW_MODEL` | – | Override the review model (default `gemini-flash-latest`) |
+| `OPENALEX_MAILTO` | – | Email for OpenAlex's polite pool (higher rate limits) |
+| `SEMANTIC_SCHOLAR_API_KEY` | – | Lifts Semantic Scholar rate limits |
+| `ADS_API_TOKEN` | – | Enables the NASA ADS source |
+| `RERANK_PROVIDER` | – | `auto` / `google` / `anthropic` / `none` |
+| `REVIEWER3_API_KEY`, `REVIEWER3_USER_ID` | – | Optional Reviewer3 multi-reviewer integration |
+
+### Frontend (`frontend/.env.local`)
+| Variable | Required | Purpose |
+|---|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | ✅ | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | ✅ | Supabase anon key (auth) |
+| `NEXT_PUBLIC_SITE_URL` | ✅ | Base URL for auth callbacks (e.g. `http://localhost:3000`) |
+| `NEXT_PUBLIC_BACKEND_URL` | ✅ | FastAPI engine URL (e.g. `http://localhost:8000`) |
+| `ANTHROPIC_API_KEY` | ✅ | Assistant (chat) calls Claude from the Next.js server |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅* | Server-only; verifies public API keys. *Required only for the Developer API.* |
+
+## 🧑‍💻 Developer API
+
+Signed-in users can create API keys at **`/developer`** and call the platform's
+engines over HTTP at `https://<your-host>/api/v1`:
+
+| Endpoint | Method | Description |
+|---|---|---|
+| `/api/v1/search` | GET | Multi-source paper search |
+| `/api/v1/citation-network` | POST | Build a citation graph from a DOI |
+| `/api/v1/trends` | POST | Trend clustering + AI synthesis for a topic |
+| `/api/v1/review` | POST | AI paper assessment (multipart file upload) |
+
+Authenticate with `Authorization: Bearer <key>`. Full reference and code
+samples live on the in-app Developer page. See
+[`frontend/README.md`](frontend/README.md) for implementation details.
+
+## 📁 Repository structure
+
+```
+Metascience_Platform/
+├── frontend/                 # Next.js web app
+│   ├── app/                  # routes (research, citation, review, docs, developer, api)
+│   ├── components/           # UI components
+│   ├── lib/                  # stores, supabase clients, api gateway helpers
+│   └── supabase_migration_*.sql
+├── backend/                  # FastAPI engine
+│   └── app/
+│       ├── routes/           # HTTP endpoints
+│       └── services/         # search, citations, trends, review, clustering, cache
+└── README.md
+```
+
+## 📚 Component docs
+- [Frontend documentation](frontend/README.md)
+- [Backend documentation](backend/Readme.md)
+- [Search subsystem](backend/app/services/search/README.md)
 
 ## 🤝 Contributing
-Contributions are welcome! Please read the [Contributing Guidelines](CONTRIBUTING.md) and our [Code of Conduct](CODE_OF_CONDUCT.md).
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## 📄 License
-This project is licensed under the [MIT License](LICENSE).
+[MIT](LICENSE).
 
 ## 🛡️ Security
-To report a security vulnerability, please see our [Security Policy](SECURITY.md).
+To report a vulnerability, see the [Security Policy](SECURITY.md).

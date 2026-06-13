@@ -10,10 +10,11 @@ import {
   TrendingUp,
   BookText,
   FileCheck,
-  Shield,
+  BookOpen,
   User,
   History,
   Menu,
+  MessageCircle,
   X,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth/context";
@@ -29,12 +30,13 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const getActiveTab = () => {
+    if (pathname.startsWith("/research/chat")) return "chat";
     if (pathname.startsWith("/research/search")) return "search";
     if (pathname.startsWith("/research/analysis")) return "analysis";
     if (pathname.startsWith("/research/history")) return "history";
     if (pathname.startsWith("/citation")) return "citation";
     if (pathname.startsWith("/review")) return "review";
-    if (pathname.startsWith("/methods")) return "methods";
+    if (pathname.startsWith("/docs")) return "docs";
 
     return "";
   };
@@ -46,8 +48,10 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
       router.push("/citation");
     } else if (tabId === "review") {
       router.push("/review");
-    } else if (tabId === "methods") {
-      router.push("/methods");
+    } else if (tabId === "docs") {
+      router.push("/docs");
+    } else if (tabId === "chat") {
+      router.push("/research/chat");
     } else if (tabId === "search") {
       router.push("/research/search");
     } else if (tabId === "analysis") {
@@ -94,6 +98,11 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
 
   const navItems = [
     {
+      id: "chat",
+      label: "Assistant",
+      icon: MessageCircle,
+    },
+    {
       id: "search",
       label: "Search",
       icon: Search,
@@ -119,9 +128,9 @@ export const Navbar: React.FC<NavbarProps> = ({ minimal = false }) => {
       icon: FileCheck,
     },
     {
-      id: "methods",
-      label: "Methods",
-      icon: Shield,
+      id: "docs",
+      label: "Docs",
+      icon: BookOpen,
     },
   ];
 

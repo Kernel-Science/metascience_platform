@@ -9,6 +9,7 @@ from urllib.parse import quote
 logger = logging.getLogger(__name__)
 from typing import List, Dict, Any, Union
 from app.core.exceptions import safe_execution
+from app.config import SEMANTIC_SCHOLAR_API_KEY
 
 
 try:
@@ -20,7 +21,11 @@ except ImportError as e:
 
 class AdvancedResearchAPIClient:
     def __init__(self):
-        self.httpx_client = httpx.AsyncClient(timeout=30.0)  # Reduced from 60s
+        # Authenticate Semantic Scholar calls when a key is configured (lifts the
+        # unauthenticated rate limits that made the legacy citation fallback flaky).
+        # OpenAlex / OpenCitations ignore the extra header harmlessly.
+        headers = {"x-api-key": SEMANTIC_SCHOLAR_API_KEY} if SEMANTIC_SCHOLAR_API_KEY else {}
+        self.httpx_client = httpx.AsyncClient(timeout=30.0, headers=headers)  # Reduced from 60s
         # OPTIMIZATION: In-memory cache with TTL
         self._cache = {}
         self._cache_ttl = 3600  # 1 hour TTL

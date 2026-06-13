@@ -11,6 +11,99 @@ import { useCitationStore } from "@/lib/citationStore";
 // Use local API routes to avoid CORS issues
 const API_BASE_URL = "";
 
+// Distinct palette for theme clusters (readable on light + dark backgrounds).
+const CLUSTER_COLORS = [
+  "#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#ec4899",
+  "#8b5cf6", "#ef4444", "#14b8a6", "#a855f7", "#84cc16",
+];
+const ROLE_COLORS: Record<string, string> = {
+  seed: "#6366f1", cited: "#8b5cf6", citing: "#06b6d4", other: "#10b981",
+};
+
+// Node color depends on the active mode: "theme" (embedding cluster) or "role"
+// (seed / cited / citing). Seeds keep a dark ring + star shape so they stay
+// identifiable in either mode.
+const nodeColor = (role: string, cluster: number, mode: "theme" | "role") => {
+  const bg =
+    mode === "role"
+      ? ROLE_COLORS[role] || ROLE_COLORS.other
+      : cluster == null || cluster < 0
+        ? "#94a3b8"
+        : CLUSTER_COLORS[cluster % CLUSTER_COLORS.length];
+  return {
+    background: bg,
+    border: role === "seed" ? "#111827" : bg,
+    highlight: { background: bg, border: "#ffffff" },
+    hover: { background: bg, border: "#ffffff" },
+  };
+};
+
+// Build a vis-network node from a backend node (shared by initial render + expand)
+const buildVisualNode = (node: any, mode: "theme" | "role") => {
+  const isSeed = node.isSeed;
+  const role: string = isSeed ? "seed" : node.type || "other";
+  const cluster: number =
+    typeof node.cluster === "number" ? node.cluster : -1;
+  const citationCount = node.citationsCount || 0;
+  const baseSize = 15;
+  const maxSize = 35;
+  const size = isSeed
+    ? 28
+    : Math.min(maxSize, baseSize + Math.sqrt(citationCount + 1) * 2);
+
+  return {
+    id: node.id,
+    label:
+      node.label && node.label.length > 25
+        ? node.label.substring(0, 25) + "..."
+        : node.label || node.title?.substring(0, 25) + "..." || "Paper",
+    title: node.title || "Paper",
+    color: nodeColor(role, cluster, mode),
+    shape: isSeed ? "star" : "dot",
+    size,
+    font: {
+      size: 12,
+      color: "#374151",
+      face: "system-ui, -apple-system, sans-serif",
+      strokeWidth: 2,
+      strokeColor: "#ffffff",
+    },
+    borderWidth: isSeed ? 3 : 2,
+    shadow: false,
+    _role: role,
+    _cluster: cluster,
+  };
+};
+
+// Build a vis-network edge from a backend edge (deterministic id for dedup)
+const buildVisualEdge = (edge: any, firstSeedId?: string) => {
+  const isCitingEdge = firstSeedId && edge.from === firstSeedId;
+  const isCitedEdge = firstSeedId && edge.to === firstSeedId;
+  const hoverColor = isCitingEdge
+    ? "#8b5cf6"
+    : isCitedEdge
+      ? "#06b6d4"
+      : "#6366f1";
+
+  return {
+    id: `edge_${edge.from}_${edge.to}`,
+    from: edge.from,
+    to: edge.to,
+    arrows: { to: false, from: false, middle: false },
+    color: {
+      color: "rgba(156, 163, 175, 0.7)",
+      highlight: hoverColor,
+      hover: hoverColor,
+    },
+    width: 1.5,
+    smooth: { enabled: true, type: "cubicBezier", roundness: 0.2 },
+    physics: true,
+    shadow: false,
+    selectionWidth: 2,
+    _hoverColor: hoverColor,
+  };
+};
+
 interface NetworkGraphProps {
   query: string;
   onNodeSelect: (node?: Article) => void;
@@ -57,6 +150,12 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [allNodesData, setAllNodesData] = useState<Article[]>([]);
   const [networkStats, setNetworkStats] = useState<any>(null);
+  const [colorBy, setColorBy] = useState<"theme" | "role">("theme");
+  const [networkClusters, setNetworkClusters] = useState<any[]>([]);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [expanding, setExpanding] = useState(false);
+  const colorByRef = React.useRef<"theme" | "role">("theme");
+  const seedIdsRef = React.useRef<string[]>([]);
   const networkRef = React.useRef<any>(null);
 
   // Ref to track the current fetch operation and prevent concurrent requests
@@ -298,6 +397,9 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
     };
 
     const processNetworkData = async (data: any) => {
+      // Theme clusters (for node coloring + legend)
+      setNetworkClusters(Array.isArray(data.clusters) ? data.clusters : []);
+
       // Handle different response formats between GET and POST endpoints
       let papers, nodes, edges, seedPaperIds;
 
@@ -329,6 +431,7 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
         Array.isArray(seedPaperIds) && seedPaperIds.length > 0
           ? seedPaperIds
           : [];
+      seedIdsRef.current = validSeedPaperIds;
 
       // Convert papers to Article format - use the 'papers' array from the backend
       const articles: Article[] = allPapersData.map((paper: any) => ({
@@ -391,110 +494,15 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
         isSeed: validSeedPaperIds.includes(paper.id),
       }));
 
-      // Create graph nodes with modern minimal styling - use the 'nodes' array from the network object
-      const visualNodes = graphNodes.map((node: any) => {
-        const isSeed = node.isSeed;
-        const citationCount = node.citationsCount || 0;
+      // Build graph nodes (color by theme/role, seeds as stars) via shared helper
+      const visualNodes = graphNodes.map((node: any) =>
+        buildVisualNode(node, colorByRef.current),
+      );
 
-        // Modern color scheme with subtle differentiation
-        let nodeColor, borderColor;
-
-        if (isSeed) {
-          nodeColor = "#6366f1"; // Modern indigo for seed papers
-          borderColor = "#4f46e5";
-        } else if (node.type === "cited") {
-          nodeColor = "#8b5cf6"; // Modern purple for cited papers
-          borderColor = "#7c3aed";
-        } else if (node.type === "citing") {
-          nodeColor = "#06b6d4"; // Modern cyan for citing papers
-          borderColor = "#0891b2";
-        } else {
-          nodeColor = "#10b981"; // Modern emerald for other papers
-          borderColor = "#059669";
-        }
-
-        // Clean size scaling
-        const baseSize = 15;
-        const maxSize = 35;
-        const size = isSeed
-          ? 30
-          : Math.min(maxSize, baseSize + Math.sqrt(citationCount + 1) * 2);
-
-        // Create a clean text-only tooltip using the paper data
-        let tooltipText = node.title || "Paper"; // Use the pre-formatted title from the backend node
-
-        return {
-          id: node.id,
-          label:
-            node.label && node.label.length > 25
-              ? node.label.substring(0, 25) + "..."
-              : node.label || node.title?.substring(0, 25) + "..." || "Paper",
-          title: tooltipText,
-          color: {
-            background: nodeColor,
-            border: borderColor,
-            highlight: {
-              background: nodeColor,
-              border: "#ffffff",
-            },
-            hover: {
-              background: nodeColor,
-              border: "#ffffff",
-            },
-          },
-          shape: "dot",
-          size: size,
-          font: {
-            size: 12,
-            color: "#374151",
-            face: "system-ui, -apple-system, sans-serif",
-            strokeWidth: 2,
-            strokeColor: "#ffffff",
-          },
-          borderWidth: isSeed ? 3 : 2,
-          shadow: false, // Disable shadows for better performance
-        };
-      });
-
-      // Create graph edges - all edges start gray; hover on a node will colorise its connections
-      const visualEdges = graphEdges.map((edge: any, index: number) => {
-        const firstSeedId = validSeedPaperIds[0];
-        const isCitingEdge = firstSeedId && edge.from === firstSeedId;
-        const isCitedEdge = firstSeedId && edge.to === firstSeedId;
-
-        // Determine the *hover* color for this edge based on its type
-        let hoverColor: string;
-        if (isCitingEdge) {
-          hoverColor = "#8b5cf6"; // Purple for papers cited by seed (references)
-        } else if (isCitedEdge) {
-          hoverColor = "#06b6d4"; // Cyan for papers citing seed (citations)
-        } else {
-          hoverColor = "#6366f1"; // Indigo for indirect connections
-        }
-
-        return {
-          id: `edge_${edge.from}_${edge.to}_${index}_${new Date().getTime()}`,
-          from: edge.from,
-          to: edge.to,
-          arrows: { to: false, from: false, middle: false },
-          color: {
-            color: "rgba(156, 163, 175, 0.7)",      // RGBA for immediate visibility
-            highlight: hoverColor,
-            hover: hoverColor,
-          },
-          width: 1.5,
-          smooth: {
-            enabled: true,
-            type: "cubicBezier",
-            roundness: 0.2,
-          },
-          physics: true,
-          shadow: false,
-          selectionWidth: 2,
-          // Stash the hover color so event handlers can read it later
-          _hoverColor: hoverColor,
-        };
-      });
+      // Create graph edges via shared helper (gray; hover colorises connections)
+      const visualEdges = graphEdges.map((edge: any) =>
+        buildVisualEdge(edge, validSeedPaperIds[0]),
+      );
 
       // Ensure unique nodes (deduplicate by ID)
       const uniqueNodes = [];
@@ -663,6 +671,21 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
     setCitationGraph(graph);
   }, [graph, setCitationGraph]);
 
+  // Recolor nodes in place when the Theme/Role toggle changes (no relayout).
+  useEffect(() => {
+    colorByRef.current = colorBy;
+    if (!networkRef.current) return;
+    try {
+      const updates = (graph.nodes || []).map((n: any) => ({
+        id: n.id,
+        color: nodeColor(n._role, n._cluster, colorBy),
+      }));
+      if (updates.length) networkRef.current.body.data.nodes.update(updates);
+    } catch {
+      // dataset not ready; ignore
+    }
+  }, [colorBy, graph]);
+
   // Add a key to force remounting the Graph component when query changes
   // Add a key to force remounting the Graph component when query changes
   const graphKey = query + "-" + (graph.nodes?.length || 0) + "-" + (graph.edges?.length || 0);
@@ -825,12 +848,14 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
       const { nodes } = event;
 
       if (nodes.length > 0) {
-        const selectedNodeId = nodes[0];
-        const selectedNodeData = allNodesData.find(
-          (node) => node.id === selectedNodeId,
-        );
+        const nodeId = nodes[0];
+
+        setSelectedNodeId(nodeId);
+        const selectedNodeData = allNodesData.find((node) => node.id === nodeId);
 
         onNodeSelect(selectedNodeData);
+      } else {
+        setSelectedNodeId(null);
       }
     },
     hoverNode: (event: any) => {
@@ -905,6 +930,96 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
     },
   };
 
+  // Expand a node: fetch its neighborhood, re-cluster the merged graph, merge in.
+  const handleExpand = async (nodeId: string) => {
+    if (!nodeId || expanding) return;
+    setExpanding(true);
+    try {
+      const existing = allNodesData.map((p: any) => ({
+        id: p.id,
+        title: p.title,
+        abstract: p.abstract,
+        citationCount: p.citationCount,
+        year: p.year,
+      }));
+      const res = await fetch(`${API_BASE_URL}/api/citation-network/expand`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: nodeId, existing }),
+      });
+
+      if (!res.ok) return;
+      const json = await res.json();
+      const data = json.data || json;
+      const newNodes: any[] = data.nodes || [];
+      const newEdges: any[] = data.edges || [];
+      const newPapers: any[] = data.papers || [];
+      const assignments: Record<string, number> = data.assignments || {};
+      const clusters: any[] = data.clusters || [];
+
+      const existingIds = new Set(graph.nodes.map((n: any) => n.id));
+      const firstSeedId = seedIdsRef.current[0];
+
+      // Recolor existing nodes per the re-clustered assignments
+      const recoloredExisting = graph.nodes.map((n: any) => {
+        const cl = assignments[n.id] ?? n._cluster;
+
+        return {
+          ...n,
+          _cluster: cl,
+          color: nodeColor(n._role, cl, colorByRef.current),
+        };
+      });
+      // Build the newly added nodes (skip duplicates)
+      const addedNodes = newNodes
+        .filter((n) => !existingIds.has(n.id))
+        .map((n) =>
+          buildVisualNode(
+            { ...n, cluster: assignments[n.id] ?? -1 },
+            colorByRef.current,
+          ),
+        );
+
+      const existingEdgeKeys = new Set(
+        graph.edges.map((e: any) => `${e.from}->${e.to}`),
+      );
+      const addedEdges = newEdges
+        .filter((e) => !existingEdgeKeys.has(`${e.from}->${e.to}`))
+        .map((e) => buildVisualEdge(e, firstSeedId));
+
+      setGraph({
+        nodes: [...recoloredExisting, ...addedNodes],
+        edges: [...graph.edges, ...addedEdges],
+      });
+      setNetworkClusters(clusters);
+
+      // Merge new papers into the article list + citation store
+      const newArticles = newPapers
+        .filter((p) => !existingIds.has(p.id))
+        .map((p: any) => ({
+          id: p.id,
+          doi: p.doi || "",
+          title: p.title,
+          authors: Array.isArray(p.authors) ? p.authors : [],
+          year: p.year,
+          journal: p.venue || p.journal || "",
+          abstract: p.abstract,
+          citationCount: p.citationCount || p.citationsCount || 0,
+          source: p.source,
+          isSeed: false,
+        }));
+      const mergedArticles = [...allNodesData, ...newArticles] as Article[];
+
+      setAllNodesData(mergedArticles);
+      setAllNodes(mergedArticles);
+      setCitationPapers(mergedArticles);
+    } catch {
+      // expansion failed; leave the current graph intact
+    } finally {
+      setExpanding(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-96">
@@ -913,7 +1028,7 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
           Building citation network...
         </p>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-          Fetching papers from Semantic Scholar, OpenAlex, and OpenCitations...
+          Fetching references and citations from OpenAlex...
         </p>
       </div>
     );
@@ -985,6 +1100,55 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
               </span>
             )}
           </div>
+
+          {/* Color-by toggle + theme legend */}
+          <div className="flex flex-wrap items-center gap-3 mt-3">
+            <span className="text-xs font-medium text-gray-500">Color by:</span>
+            <div className="inline-flex overflow-hidden rounded-md border border-gray-200 text-xs">
+              <button
+                className={
+                  colorBy === "theme"
+                    ? "px-2.5 py-1 bg-gray-800 text-white"
+                    : "px-2.5 py-1 text-gray-600 hover:bg-gray-100"
+                }
+                onClick={() => setColorBy("theme")}
+              >
+                Theme
+              </button>
+              <button
+                className={
+                  colorBy === "role"
+                    ? "px-2.5 py-1 bg-gray-800 text-white"
+                    : "px-2.5 py-1 text-gray-600 hover:bg-gray-100"
+                }
+                onClick={() => setColorBy("role")}
+              >
+                Role
+              </button>
+            </div>
+            {colorBy === "theme" ? (
+              networkClusters.slice(0, 6).map((c: any) => (
+                <span
+                  key={c.id}
+                  className="inline-flex items-center gap-1 text-xs text-gray-600"
+                >
+                  <span
+                    className="inline-block w-3 h-3 rounded-full"
+                    style={{
+                      background: CLUSTER_COLORS[c.id % CLUSTER_COLORS.length],
+                    }}
+                  />
+                  {(c.label_terms || []).slice(0, 3).join(", ")} ({c.size})
+                </span>
+              ))
+            ) : (
+              <span className="text-xs text-gray-500">
+                ★ seed ·{" "}
+                <span style={{ color: ROLE_COLORS.cited }}>●</span> cited ·{" "}
+                <span style={{ color: ROLE_COLORS.citing }}>●</span> citing
+              </span>
+            )}
+          </div>
         </div>
       )}
       <div className="p-4 relative">
@@ -1000,6 +1164,17 @@ const NetworkGraph: React.FC<NetworkGraphProps> = ({
           </svg>
           Recenter
         </button>
+        {/* Expand selected node into its neighborhood */}
+        {selectedNodeId && (
+          <button
+            onClick={() => handleExpand(selectedNodeId)}
+            disabled={expanding}
+            title="Expand this paper's references and citations into the map"
+            className="absolute top-6 left-6 z-10 flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-all hover:bg-indigo-700 disabled:opacity-60"
+          >
+            {expanding ? "Expanding…" : "＋ Expand paper"}
+          </button>
+        )}
         <Graph
           key={graphKey}
           events={events}

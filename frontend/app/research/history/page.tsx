@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import { Navbar } from "@/components/navbar";
+import { AppShell } from "@/components/app-shell";
 import { Message } from "@/components/research/Message";
 import { FeedbackButton } from "@/components/feedback/FeedbackButton";
 import { HistoryTab } from "@/components/research/HistoryTab";
@@ -122,8 +122,7 @@ export default function HistoryPage() {
 
   return (
     <ProtectedRoute>
-      <div className="brand-app-shell">
-        <Navbar />
+      <AppShell>
 
         <Message
           error={error}
@@ -136,7 +135,7 @@ export default function HistoryPage() {
 
           <FeedbackButton tabName="search" />
         </main>
-      </div>
+      </AppShell>
     </ProtectedRoute>
   );
 }

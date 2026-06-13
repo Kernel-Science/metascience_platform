@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@heroui/button";
 import { Card, CardBody, CardHeader } from "@heroui/card";
 import { Input } from "@heroui/input";
@@ -19,16 +20,19 @@ import {
   Camera,
   Sun,
   Moon,
+  Code2,
+  ChevronRight,
 } from "lucide-react";
 
 import { useAuth } from "@/lib/auth/context";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import { Navbar } from "@/components/navbar";
+import { AppShell } from "@/components/app-shell";
 import { createClient } from "@/lib/supabase/client";
 
 export default function ProfilePage() {
   const { user, signOut } = useAuth();
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [displayName, setDisplayName] = useState(
     user?.user_metadata?.full_name || "",
@@ -206,10 +210,9 @@ export default function ProfilePage() {
 
   return (
     <ProtectedRoute>
-      <div className="brand-app-shell">
-        <Navbar />
+      <AppShell>
 
-        <main className="container mx-auto px-6 py-24 max-w-4xl">
+        <main className="container mx-auto px-6 py-10 max-w-4xl">
           <motion.div
             animate={{ opacity: 1, y: 0 }}
             className="space-y-8"
@@ -549,6 +552,35 @@ export default function ProfilePage() {
 
                 <Divider />
 
+                {/* Developer / API */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-foreground">
+                    Developer
+                  </h3>
+
+                  <button
+                    type="button"
+                    onClick={() => router.push("/developer")}
+                    className="flex w-full items-center gap-3 rounded-lg bg-default-100/50 p-3 text-left transition-colors hover:bg-default-100"
+                  >
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10">
+                      <Code2 className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        API keys &amp; documentation
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        Create keys and integrate the platform into your own
+                        projects
+                      </p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-foreground/40" />
+                  </button>
+                </div>
+
+                <Divider />
+
                 {/* Actions */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold text-foreground">
@@ -584,7 +616,7 @@ export default function ProfilePage() {
             </Card>
           </motion.div>
         </main>
-      </div>
+      </AppShell>
     </ProtectedRoute>
   );
 }
