@@ -34,7 +34,8 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-pnpm-lock.yaml
+# Commit pnpm-lock.yaml for reproducible installs/deploys (this project uses pnpm).
+# Keep the competing lockfiles ignored so contributors don't add a conflicting one.
 yarn.lock
 package-lock.json
 bun.lockb
