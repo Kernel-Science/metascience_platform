@@ -8,6 +8,20 @@ export const dynamic = "force-dynamic";
 
 type Params = { params: Promise<{ sessionId: string }> };
 
+async function parseResponseBody(response: Response) {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      error: "Invalid JSON response from the backend",
+      detail: text.slice(0, 500),
+    };
+  }
+}
+
 async function proxy(method: "GET" | "DELETE", sessionId: string) {
   try {
     const response = await fetch(
@@ -15,7 +29,7 @@ async function proxy(method: "GET" | "DELETE", sessionId: string) {
       { method },
     );
 
-    const data = await response.json();
+    const data = await parseResponseBody(response);
 
     return NextResponse.json(data, { status: response.status });
   } catch (error) {

@@ -54,6 +54,23 @@ def _error_message(response: httpx.Response) -> str:
         return response.text[:300] or f"HTTP {response.status_code}"
 
 
+def _parse_json_body(response: httpx.Response, *, context: str) -> Dict[str, Any]:
+    """Parse Reviewer3 JSON responses or raise a clear service error."""
+    try:
+        return response.json()
+    except ValueError:
+        body_text = response.text[:1000]
+        logger.error(
+            "Reviewer3 returned a non-JSON response while %s: %s",
+            context,
+            body_text,
+        )
+        raise Reviewer3Error(
+            f"Reviewer3 returned an unexpected response while {context}",
+            502,
+        )
+
+
 class Reviewer3Service:
     def __init__(self) -> None:
         self.api_key = REVIEWER3_API_KEY
@@ -141,7 +158,7 @@ class Reviewer3Service:
             files={"file": (filename, file_content, "application/pdf")},
             data=data,
         )
-        body = response.json()
+        body = _parse_json_body(response, context="submitting the review")
         logger.info(f"Reviewer3 session created: {body.get('sessionId')}")
         return {"session_id": body.get("sessionId"), "review_mode": review_mode}
 
@@ -150,7 +167,7 @@ class Reviewer3Service:
         response = await self._request(
             "GET", f"/api/internal/review/{session_id}"
         )
-        body = response.json()
+        body = _parse_json_body(response, context="polling the review status")
         session = body.get("session") or {}
         comments = [
             {
@@ -190,7 +207,8 @@ class Reviewer3Service:
         response = await self._request(
             "POST", f"/api/internal/review/{session_id}/share"
         )
-        return {"url": response.json().get("url")}
+        body = _parse_json_body(response, context="creating the share link")
+        return {"url": body.get("url")}
 
 
 reviewer3_service = Reviewer3Service()

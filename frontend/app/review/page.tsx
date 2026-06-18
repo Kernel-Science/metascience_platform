@@ -230,6 +230,20 @@ export default function ReviewPage() {
     return null;
   };
 
+  const parseReviewer3Response = async (response: Response) => {
+    const text = await response.text();
+    if (!text) return {};
+
+    try {
+      return JSON.parse(text);
+    } catch {
+      return {
+        error: "Invalid JSON response from the Reviewer3 proxy",
+        detail: text.slice(0, 500),
+      };
+    }
+  };
+
   // Fire-and-forget submission to Reviewer3; the Reviewer3Panel polls the
   // session until the multi-reviewer critique completes.
   const submitToReviewer3 = async (file: File) => {
@@ -246,7 +260,7 @@ export default function ReviewPage() {
         method: "POST",
         body: fd,
       });
-      const data = await res.json();
+      const data = await parseReviewer3Response(res);
 
       if (!res.ok || !data.session_id) {
         setReviewer3Status("error");

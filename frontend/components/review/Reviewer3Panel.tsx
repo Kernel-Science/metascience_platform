@@ -28,6 +28,20 @@ const Reviewer3ReviewViewer = dynamic(
 
 const POLL_INTERVAL_MS = 15000;
 
+async function parseReviewer3Response(response: Response) {
+  const text = await response.text();
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      error: "Invalid JSON response from the Reviewer3 proxy",
+      detail: text.slice(0, 500),
+    };
+  }
+}
+
 interface Reviewer3Stage {
   stage_id: string;
   status: string;
@@ -68,7 +82,7 @@ export function Reviewer3Panel() {
     const poll = async () => {
       try {
         const res = await fetch(`/api/review/reviewer3/${reviewer3SessionId}`);
-        const data = await res.json();
+        const data = await parseReviewer3Response(res);
 
         if (cancelled) return;
 
@@ -127,7 +141,7 @@ export function Reviewer3Panel() {
         `/api/review/reviewer3/${reviewer3SessionId}/share`,
         { method: "POST" },
       );
-      const data = await res.json();
+      const data = await parseReviewer3Response(res);
       if (res.ok && data.url) {
         setReviewer3ShareUrl(data.url);
         // Keep the stored session row in sync with the new share link.

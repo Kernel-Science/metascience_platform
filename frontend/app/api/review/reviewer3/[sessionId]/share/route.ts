@@ -18,7 +18,18 @@ export async function POST(
       { method: "POST" },
     );
 
-    const data = await response.json();
+    const text = await response.text();
+    let data: Record<string, unknown> = {};
+    if (text) {
+      try {
+        data = JSON.parse(text) as Record<string, unknown>;
+      } catch {
+        data = {
+          error: "Invalid JSON response from the backend",
+          detail: text.slice(0, 500),
+        };
+      }
+    }
 
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
