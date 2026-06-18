@@ -263,9 +263,19 @@ export default function ReviewPage() {
       const data = await parseReviewer3Response(res);
 
       if (!res.ok || !data.session_id) {
+        // A reverse proxy (e.g. nginx client_max_body_size) rejects oversized
+        // uploads with a 413 HTML page before they reach the app; turn that
+        // into something actionable instead of a raw markup snippet.
+        const raw = String(data.detail || data.error || "");
+        const tooLarge =
+          res.status === 413 || /\b413\b|request entity too large/i.test(raw);
         setReviewer3Status("error");
         setReviewer3Error(
-          data.detail || data.error || `HTTP ${res.status}: submission failed`,
+          tooLarge
+            ? "This PDF is too large for the server to accept. Try a smaller PDF, or ask the site admin to raise the upload size limit."
+            : data.detail ||
+                data.error ||
+                `HTTP ${res.status}: submission failed`,
         );
         return;
       }

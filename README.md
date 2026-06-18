@@ -114,6 +114,21 @@ For production: `pnpm build && pnpm start`.
 | `ANTHROPIC_API_KEY` | ✅ | Assistant (chat) calls Claude from the Next.js server |
 | `SUPABASE_SERVICE_ROLE_KEY` | ✅* | Server-only; verifies public API keys. *Required only for the Developer API.* |
 
+## 🚀 Deployment notes
+
+Paper review and the Reviewer3 integration upload PDFs (multipart). If a
+reverse proxy sits in front of the app (nginx, etc.), its body-size limit must
+be raised or uploads are rejected **before reaching the app** — nginx's default
+`client_max_body_size` is **1 MB**, which rejects almost every academic PDF with
+a `413` HTML error page (the app then sees the cryptic “Unexpected token `<`”).
+
+```nginx
+# in the server { } block(s) that proxy to the frontend and backend
+client_max_body_size 100m;
+```
+
+Reload after changing it: `sudo nginx -t && sudo systemctl reload nginx`.
+
 ## 🧑‍💻 Developer API
 
 Signed-in users can create API keys at **`/developer`** and call the platform's

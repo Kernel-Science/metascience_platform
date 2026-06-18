@@ -27,6 +27,10 @@ const Reviewer3ReviewViewer = dynamic(
 );
 
 const POLL_INTERVAL_MS = 15000;
+// A review runs upstream for many minutes; a server restart or gateway hiccup
+// must not kill it. Tolerate this many consecutive failed polls (~5 min at the
+// interval above) before surfacing a soft, recoverable error.
+const MAX_POLL_FAILURES = 20;
 
 async function parseReviewer3Response(response: Response) {
   const text = await response.text();
@@ -69,6 +73,9 @@ export function Reviewer3Panel() {
   const [shareCopied, setShareCopied] = React.useState(false);
   // Pipeline progress while the review runs; ephemeral, so component state.
   const [stages, setStages] = React.useState<Reviewer3Stage[]>([]);
+  // Consecutive failed polls; reset on any success. Survives re-renders so a
+  // run of transient errors is tracked across the polling interval.
+  const pollFailuresRef = React.useRef(0);
 
   // Poll the session while the review is running. Store-backed state means
   // polling resumes if the user navigates away and comes back.
@@ -78,6 +85,18 @@ export function Reviewer3Panel() {
       return;
 
     let cancelled = false;
+    pollFailuresRef.current = 0;
+
+    const onTransientFailure = () => {
+      pollFailuresRef.current += 1;
+      if (pollFailuresRef.current >= MAX_POLL_FAILURES) {
+        setReviewer3Status("error");
+        setReviewer3Error(
+          "Lost contact with the review service. The review may still be " +
+            "running — reload the page to resume polling.",
+        );
+      }
+    };
 
     const poll = async () => {
       try {
@@ -87,11 +106,24 @@ export function Reviewer3Panel() {
         if (cancelled) return;
 
         if (!res.ok) {
-          setReviewer3Status("error");
-          setReviewer3Error(data.detail || data.error || `HTTP ${res.status}`);
+          // 4xx (except rate-limit) is terminal: the session is gone, not
+          // owned, or invalid, and retrying won't help. 5xx / 429 / network
+          // blips are transient — keep polling so a backend restart or gateway
+          // hiccup never kills a review that is still running upstream.
+          const terminal =
+            res.status >= 400 && res.status < 500 && res.status !== 429;
+          if (terminal) {
+            setReviewer3Status("error");
+            setReviewer3Error(
+              data.detail || data.error || `HTTP ${res.status}`,
+            );
+            return;
+          }
+          onTransientFailure();
           return;
         }
 
+        pollFailuresRef.current = 0;
         setStages(data.stages || []);
 
         if (data.status === "completed") {
@@ -108,7 +140,10 @@ export function Reviewer3Panel() {
           setReviewer3Status(data.status);
         }
       } catch {
-        // Transient network error — keep polling.
+        // Network error reaching our own proxy — transient, keep polling up to
+        // the failure ceiling.
+        if (cancelled) return;
+        onTransientFailure();
       }
     };
 

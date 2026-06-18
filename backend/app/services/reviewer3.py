@@ -15,6 +15,7 @@ user:create, so that id has to be provisioned out-of-band by the Reviewer3
 team. Without it the service reports itself unconfigured.
 """
 
+import asyncio
 import logging
 from typing import Any, Dict, Optional
 
@@ -29,9 +30,30 @@ SEVERITY_LABELS = {1: "critical", 2: "major", 3: "minor", 4: "editorial"}
 
 REVIEW_MODES = {"author", "journal"}
 
-# Submission covers upload + PDF extraction kickoff on their side; polling is cheap.
-SUBMIT_TIMEOUT_S = 180.0
+# Submission returns a session id near-instantly (~1s) when healthy; it only
+# covers the upload + extraction kickoff, not the review itself. Cap it well
+# above the healthy latency but low enough that an upstream hang fails fast and
+# the user can retry, rather than stalling for minutes. Polling is cheap.
+SUBMIT_TIMEOUT_S = 90.0
 POLL_TIMEOUT_S = 30.0
+
+# --- Resilience: retry transient upstream failures with backoff ------------
+# Connection never reached the server (or the request was never sent), so a
+# retry can never duplicate work — safe even for non-idempotent submissions.
+_CONNECT_ERRORS = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
+# The request may have been delivered; only retry these when the caller says
+# the operation is idempotent (GET/DELETE/share), never for a submission that
+# could otherwise create a duplicate (quota-charged) review.
+_INFLIGHT_ERRORS = (
+    httpx.ReadTimeout,
+    httpx.ReadError,
+    httpx.WriteError,
+    httpx.RemoteProtocolError,
+)
+# Transient upstream statuses (Google Frontend / gateway hiccups, rate limits).
+RETRYABLE_STATUS = {429, 502, 503, 504}
+MAX_ATTEMPTS = 3
+BACKOFF_BASE_S = 0.5
 
 
 class Reviewer3Error(Exception):
@@ -52,6 +74,22 @@ def _error_message(response: httpx.Response) -> str:
         return msg
     except Exception:
         return response.text[:300] or f"HTTP {response.status_code}"
+
+
+def _unreachable_message(exc: Exception) -> str:
+    """Human-readable message for a transport-level failure reaching Reviewer3.
+
+    httpx timeout exceptions stringify to empty, which previously produced the
+    bare, confusing 'Could not reach Reviewer3: '. Name the timeout explicitly
+    and steer the user toward a retry.
+    """
+    if isinstance(exc, httpx.TimeoutException):
+        return (
+            "Reviewer3 did not respond in time (request timed out). This is "
+            "usually transient — please try again."
+        )
+    detail = str(exc).strip()
+    return f"Could not reach Reviewer3: {detail}" if detail else "Could not reach Reviewer3"
 
 
 def _parse_json_body(response: httpx.Response, *, context: str) -> Dict[str, Any]:
@@ -106,28 +144,79 @@ class Reviewer3Service:
             raise Reviewer3Error(f"Reviewer3 is not configured: {reason}", 503)
 
     async def _request(
-        self, method: str, path: str, *, timeout: float = POLL_TIMEOUT_S, **kwargs: Any
+        self,
+        method: str,
+        path: str,
+        *,
+        timeout: float = POLL_TIMEOUT_S,
+        idempotent: bool = True,
+        **kwargs: Any,
     ) -> httpx.Response:
+        """Call the Reviewer3 API, retrying transient failures with backoff.
+
+        ``idempotent`` must be False for operations that must not be repeated
+        on a partial failure (a submission could otherwise create a duplicate,
+        quota-charged review). For those, only pre-flight connection failures —
+        which provably never reached the server — are retried.
+        """
         self._ensure_configured()
         url = f"{self.base_url}{path}"
-        try:
-            async with httpx.AsyncClient(timeout=timeout) as client:
-                response = await client.request(
-                    method, url, headers=self._headers(), **kwargs
-                )
-        except httpx.HTTPError as exc:
-            logger.error(f"Reviewer3 request failed: {method} {path}: {exc}")
-            raise Reviewer3Error(f"Could not reach Reviewer3: {exc}", 502)
 
-        if response.status_code >= 400:
-            message = _error_message(response)
-            logger.error(
-                f"Reviewer3 error {response.status_code} on {method} {path}: {message}"
-            )
-            # Pass 4xx through (auth, ownership, validation); mask 5xx as 502.
-            status = response.status_code if response.status_code < 500 else 502
-            raise Reviewer3Error(message, status)
-        return response
+        for attempt in range(MAX_ATTEMPTS):
+            is_last = attempt == MAX_ATTEMPTS - 1
+            try:
+                async with httpx.AsyncClient(timeout=timeout) as client:
+                    response = await client.request(
+                        method, url, headers=self._headers(), **kwargs
+                    )
+            except _CONNECT_ERRORS as exc:
+                # Never reached the server — always safe to retry.
+                if is_last:
+                    logger.error(f"Reviewer3 unreachable: {method} {path}: {exc!r}")
+                    raise Reviewer3Error(_unreachable_message(exc), 502)
+                await self._backoff(attempt, method, path, f"connect error: {exc!r}")
+                continue
+            except _INFLIGHT_ERRORS as exc:
+                if idempotent and not is_last:
+                    await self._backoff(attempt, method, path, f"transport error: {exc!r}")
+                    continue
+                logger.error(f"Reviewer3 request failed: {method} {path}: {exc!r}")
+                raise Reviewer3Error(_unreachable_message(exc), 502)
+            except httpx.HTTPError as exc:
+                logger.error(f"Reviewer3 request failed: {method} {path}: {exc!r}")
+                raise Reviewer3Error(_unreachable_message(exc), 502)
+
+            if (
+                response.status_code in RETRYABLE_STATUS
+                and idempotent
+                and not is_last
+            ):
+                await self._backoff(
+                    attempt, method, path, f"HTTP {response.status_code}"
+                )
+                continue
+
+            if response.status_code >= 400:
+                message = _error_message(response)
+                logger.error(
+                    f"Reviewer3 error {response.status_code} on {method} {path}: {message}"
+                )
+                # Pass 4xx through (auth, ownership, validation); mask 5xx as 502.
+                status = response.status_code if response.status_code < 500 else 502
+                raise Reviewer3Error(message, status)
+            return response
+
+        # Unreachable: the loop either returns or raises on the final attempt.
+        raise Reviewer3Error("Could not reach Reviewer3", 502)
+
+    @staticmethod
+    async def _backoff(attempt: int, method: str, path: str, reason: str) -> None:
+        delay = BACKOFF_BASE_S * (2 ** attempt)
+        logger.warning(
+            f"Reviewer3 {method} {path} retry {attempt + 1}/{MAX_ATTEMPTS} "
+            f"in {delay:.1f}s ({reason})"
+        )
+        await asyncio.sleep(delay)
 
     async def submit_review(
         self,
@@ -155,6 +244,9 @@ class Reviewer3Service:
             "POST",
             "/api/internal/review",
             timeout=SUBMIT_TIMEOUT_S,
+            # A submission charges quota and creates a session; only retry it on
+            # pre-flight connection failures, never after the request was sent.
+            idempotent=False,
             files={"file": (filename, file_content, "application/pdf")},
             data=data,
         )
